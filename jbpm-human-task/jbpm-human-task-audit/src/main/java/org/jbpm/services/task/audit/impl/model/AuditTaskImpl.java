@@ -26,6 +26,9 @@ import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.SequenceGenerator;
 import javax.persistence.Temporal;
+import org.hibernate.search.annotations.Analyze;
+import org.hibernate.search.annotations.Field;
+import org.hibernate.search.annotations.Indexed;
 
 import org.kie.internal.task.api.AuditTask;
 
@@ -34,35 +37,45 @@ import org.kie.internal.task.api.AuditTask;
  * @author salaboy
  */
 @Entity
+@Indexed
 @SequenceGenerator(name="auditIdSeq", sequenceName="AUDIT_ID_SEQ", allocationSize=1)
 public class AuditTaskImpl implements Serializable, AuditTask {
     
 	private static final long serialVersionUID = 5388016330549830043L;
 
-
-	@Id
+    @Id
     @GeneratedValue(strategy = GenerationType.AUTO, generator="auditIdSeq")
     private Long id;
     
     
     private Long taskId;
-    
+    @Field(analyze = Analyze.NO)
     private String status;
     @Temporal(javax.persistence.TemporalType.TIMESTAMP)
     private Date activationTime;
+    @Field
     private String name;
+    @Field
     private String description;
     private int priority;
+    
+    @Field( name = "user")
     private String createdBy;
+    
     private String actualOwner;
     @Temporal(javax.persistence.TemporalType.TIMESTAMP)
     private Date createdOn;
     @Temporal(javax.persistence.TemporalType.TIMESTAMP)
     private Date dueDate;
+    
     private long processInstanceId;
+    
+    @Field(analyze = Analyze.NO, name = "process")
     private String processId;
     private long processSessionId;
     private long parentId;
+            
+    @Field(analyze = Analyze.NO)
     private String deploymentId;
     private Long workItemId;
 

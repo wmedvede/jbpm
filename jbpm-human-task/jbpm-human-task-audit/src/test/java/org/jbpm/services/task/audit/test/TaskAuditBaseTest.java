@@ -22,16 +22,25 @@ import java.util.HashMap;
 import java.util.List;
 
 import javax.inject.Inject;
+import org.apache.lucene.queryParser.ParseException;
+import org.apache.lucene.queryParser.QueryParser;
+import org.apache.lucene.search.Query;
+import org.apache.lucene.util.Version;
+import org.hibernate.search.jpa.FullTextEntityManager;
+import org.hibernate.search.jpa.FullTextQuery;
+import org.hibernate.search.query.dsl.QueryBuilder;
 
 import org.jbpm.services.task.HumanTaskServicesBaseTest;
 import org.jbpm.services.task.audit.commands.DeleteAuditEventsCommand;
 import org.jbpm.services.task.audit.commands.DeleteBAMTaskSummariesCommand;
 import org.jbpm.services.task.audit.commands.GetAuditEventsCommand;
 import org.jbpm.services.task.audit.commands.GetBAMTaskSummariesCommand;
+import org.jbpm.services.task.audit.impl.model.AuditTaskImpl;
 import org.jbpm.services.task.audit.impl.model.BAMTaskSummaryImpl;
 import org.kie.internal.task.api.AuditTask;
 import org.jbpm.services.task.audit.service.TaskAuditService;
 import org.jbpm.services.task.utils.TaskFluent;
+import org.junit.Assert;
 import org.junit.Test;
 import org.kie.api.task.model.Status;
 import org.kie.api.task.model.Task;
@@ -44,8 +53,10 @@ public abstract class TaskAuditBaseTest extends HumanTaskServicesBaseTest {
     @Inject
     protected TaskAuditService taskAuditService;
     
+    protected FullTextEntityManager fullTextEntityManager;
+    
     @Test
-    public void testComplete() {
+    public void testComplete() throws ParseException {
       
         Task task = new TaskFluent().setName("This is my task name")
                                     .addPotentialGroup("Knights Templer")
@@ -137,7 +148,7 @@ public abstract class TaskAuditBaseTest extends HumanTaskServicesBaseTest {
         // test get/delete BAM Task summaries commands
         List<BAMTaskSummaryImpl> bamTaskList = taskService.execute(new GetBAMTaskSummariesCommand());
         assertEquals( "BAM Task Summary list size: ", 2, bamTaskList.size());
-        
+      
         taskService.execute(new DeleteBAMTaskSummariesCommand(taskId));
         bamTaskList = taskService.execute(new GetBAMTaskSummariesCommand());
         assertEquals( "BAM Task Summary list size after delete (task id: " + taskId + ") : ", 1, bamTaskList.size());
@@ -152,6 +163,23 @@ public abstract class TaskAuditBaseTest extends HumanTaskServicesBaseTest {
         List<AuditTask> allHistoryAuditTasks = taskAuditService.getAllAuditTasks(new QueryFilter(0,0));
         assertEquals(2, allHistoryAuditTasks.size());
         
+        Assert.assertNotNull(fullTextEntityManager);
+        QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(AuditTaskImpl.class).get();
+        String userInput = "This is my";
+        // Lucene option
+        QueryParser qp = new QueryParser(Version.LUCENE_36, "name", fullTextEntityManager.getSearchFactory().getAnalyzer(AuditTaskImpl.class));
+        Query luceneQuery = qp.parse(userInput);
+        
+        // DSL Search option
+        Query query = qb.phrase().onField("name").andField("description").sentence(userInput).createQuery();
+        //qb.all() -> it will match all the tasks with no filter 
+        
+        FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, AuditTaskImpl.class);
+        //
+        //fullTextQuery.setSort(new Sort(new SortField()))
+        
+//        FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(luceneQuery, AuditTaskImpl.class);
+        List resultList = fullTextQuery.getResultList();
     }
     
     
