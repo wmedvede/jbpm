@@ -35,7 +35,7 @@ import org.jbpm.services.task.audit.TaskAuditServiceFactory;
  *
  */
 
-public class SearchLocalTaskAuditTest extends TaskAuditBaseTest {
+public class SearchLocalTaskAuditTest extends TaskAuditSearchBaseTest {
 
 	private PoolingDataSource pds;
 	private EntityManagerFactory emf;

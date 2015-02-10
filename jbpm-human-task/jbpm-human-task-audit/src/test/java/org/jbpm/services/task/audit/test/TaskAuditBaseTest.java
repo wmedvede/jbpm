@@ -53,8 +53,7 @@ public abstract class TaskAuditBaseTest extends HumanTaskServicesBaseTest {
     @Inject
     protected TaskAuditService taskAuditService;
     
-    protected FullTextEntityManager fullTextEntityManager;
-    
+   
     @Test
     public void testComplete() throws ParseException {
       
@@ -163,23 +162,7 @@ public abstract class TaskAuditBaseTest extends HumanTaskServicesBaseTest {
         List<AuditTask> allHistoryAuditTasks = taskAuditService.getAllAuditTasks(new QueryFilter(0,0));
         assertEquals(2, allHistoryAuditTasks.size());
         
-        Assert.assertNotNull(fullTextEntityManager);
-        QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(AuditTaskImpl.class).get();
-        String userInput = "This is my";
-        // Lucene option
-        QueryParser qp = new QueryParser(Version.LUCENE_36, "name", fullTextEntityManager.getSearchFactory().getAnalyzer(AuditTaskImpl.class));
-        Query luceneQuery = qp.parse(userInput);
-        
-        // DSL Search option
-        Query query = qb.phrase().onField("name").andField("description").sentence(userInput).createQuery();
-        //qb.all() -> it will match all the tasks with no filter 
-        
-        FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, AuditTaskImpl.class);
-        //
-        //fullTextQuery.setSort(new Sort(new SortField()))
-        
-//        FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(luceneQuery, AuditTaskImpl.class);
-        List resultList = fullTextQuery.getResultList();
+       
     }
     
     

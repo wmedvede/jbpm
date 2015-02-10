@@ -27,6 +27,7 @@ import javax.persistence.Id;
 import javax.persistence.SequenceGenerator;
 import javax.persistence.Temporal;
 import org.hibernate.search.annotations.Analyze;
+import org.hibernate.search.annotations.Boost;
 import org.hibernate.search.annotations.Field;
 import org.hibernate.search.annotations.Indexed;
 
@@ -56,12 +57,14 @@ public class AuditTaskImpl implements Serializable, AuditTask {
     @Field
     private String name;
     @Field
+    @Boost(0.8f)
     private String description;
     private int priority;
     
     @Field( name = "user")
     private String createdBy;
     
+    @Field( name = "actualOwner")
     private String actualOwner;
     @Temporal(javax.persistence.TemporalType.TIMESTAMP)
     private Date createdOn;
