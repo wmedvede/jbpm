@@ -82,7 +82,7 @@ public class TaskFluent {
         return this;
     }
     
-    public TaskFluent setWorkItemId(String deploymentId){
+    public TaskFluent setDeploymentId(String deploymentId){
         ((TaskDataImpl)task.getTaskData()).setDeploymentId(deploymentId);
         return this;
     }

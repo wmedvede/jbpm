@@ -34,39 +34,35 @@ import org.jbpm.services.task.audit.TaskAuditServiceFactory;
  *
  *
  */
-
 public class SearchLocalTaskAuditTest extends TaskAuditSearchBaseTest {
 
-	private PoolingDataSource pds;
-	private EntityManagerFactory emf;
-	
-	@Before
-	public void setup() {
-		pds = setupPoolingDataSource();
-		emf = Persistence.createEntityManagerFactory( "org.jbpm.services.task" );
-                
-		HumanTaskConfigurator configurator = HumanTaskServiceFactory.newTaskServiceConfigurator()
-												.entityManagerFactory(emf)
-												.listener(new JPATaskLifeCycleEventListener(true))
-												.listener(new BAMTaskEventListener(true));
-												
-                this.taskService = (InternalTaskService) configurator.getTaskService();
-                
-                
-                fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
-                
-                
-                
-                this.taskAuditService = TaskAuditServiceFactory.newTaskAuditServiceConfigurator().setTaskService(taskService).getTaskAuditService();
-	}
-	
-	@After
-	public void clean() {
-		if (emf != null) {
-			emf.close();
-		}
-		if (pds != null) {
-			pds.close();
-		}
-	}
+    private PoolingDataSource pds;
+    private EntityManagerFactory emf;
+
+    @Before
+    public void setup() {
+        pds = setupPoolingDataSource();
+        emf = Persistence.createEntityManagerFactory("org.jbpm.services.task");
+
+        HumanTaskConfigurator configurator = HumanTaskServiceFactory.newTaskServiceConfigurator()
+                .entityManagerFactory(emf)
+                .listener(new JPATaskLifeCycleEventListener(true))
+                .listener(new BAMTaskEventListener(true));
+
+        this.taskService = (InternalTaskService) configurator.getTaskService();
+
+        fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
+
+        this.taskAuditService = TaskAuditServiceFactory.newTaskAuditServiceConfigurator().setTaskService(taskService).getTaskAuditService();
+    }
+
+    @After
+    public void clean() {
+        if (emf != null) {
+            emf.close();
+        }
+        if (pds != null) {
+            pds.close();
+        }
+    }
 }

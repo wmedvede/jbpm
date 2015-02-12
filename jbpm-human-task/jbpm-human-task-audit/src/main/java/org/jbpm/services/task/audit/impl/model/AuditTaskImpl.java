@@ -19,7 +19,6 @@ package org.jbpm.services.task.audit.impl.model;
 import java.io.Serializable;
 import java.util.Date;
 
-import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
@@ -28,8 +27,12 @@ import javax.persistence.SequenceGenerator;
 import javax.persistence.Temporal;
 import org.hibernate.search.annotations.Analyze;
 import org.hibernate.search.annotations.Boost;
+import org.hibernate.search.annotations.DateBridge;
 import org.hibernate.search.annotations.Field;
+import org.hibernate.search.annotations.FieldBridge;
 import org.hibernate.search.annotations.Indexed;
+import org.hibernate.search.annotations.Resolution;
+import org.hibernate.search.bridge.builtin.IntegerBridge;
 
 import org.kie.internal.task.api.AuditTask;
 
@@ -48,39 +51,63 @@ public class AuditTaskImpl implements Serializable, AuditTask {
     @GeneratedValue(strategy = GenerationType.AUTO, generator="auditIdSeq")
     private Long id;
     
-    
+    @Field(analyze = Analyze.NO)
     private Long taskId;
     @Field(analyze = Analyze.NO)
     private String status;
-    @Temporal(javax.persistence.TemporalType.TIMESTAMP)
+
+    @Field
+    @DateBridge(resolution = Resolution.HOUR)
+    @Temporal(javax.persistence.TemporalType.DATE)
+
     private Date activationTime;
-    @Field
-    private String name;
-    @Field
+    @Field()
+    private String name = "";
+
+    @Field()
     @Boost(0.8f)
-    private String description;
+    private String description = "";
+    
+    @Field()
+    @FieldBridge(impl = IntegerBridge.class)
+    @Boost(0.5f)
     private int priority;
     
     @Field( name = "user")
-    private String createdBy;
+    private String createdBy ;
     
     @Field( name = "actualOwner")
-    private String actualOwner;
-    @Temporal(javax.persistence.TemporalType.TIMESTAMP)
+
+    private String actualOwner = "";
+    
+    @Field
+    @DateBridge(resolution = Resolution.HOUR)
+    @Temporal(javax.persistence.TemporalType.DATE)
     private Date createdOn;
-    @Temporal(javax.persistence.TemporalType.TIMESTAMP)
+    @Field
+    @DateBridge(resolution = Resolution.HOUR)
+    @Temporal(javax.persistence.TemporalType.DATE)
+
     private Date dueDate;
     
+    @Field(analyze = Analyze.NO, name = "processInstance")
+    @FieldBridge(impl = IntegerBridge.class)
     private long processInstanceId;
     
     @Field(analyze = Analyze.NO, name = "process")
-    private String processId;
+    private String processId = "";
+    
+    
     private long processSessionId;
     private long parentId;
             
+
+    @Field(analyze = Analyze.NO, name = "deployment")
+    private String deploymentId = "";
+    
     @Field(analyze = Analyze.NO)
-    private String deploymentId;
     private Long workItemId;
+
 
     public AuditTaskImpl() {
     }
@@ -246,18 +273,22 @@ public class AuditTaskImpl implements Serializable, AuditTask {
         this.parentId = parentId;
     }
 
+    @Override
     public String getActualOwner() {
         return actualOwner;
     }
 
+    @Override
     public void setActualOwner(String actualOwner) {
         this.actualOwner = actualOwner;
     }
 
+    @Override
     public String getDeploymentId() {
         return deploymentId;
     }
 
+    @Override
     public void setDeploymentId(String deploymentId) {
         this.deploymentId = deploymentId;
     }
