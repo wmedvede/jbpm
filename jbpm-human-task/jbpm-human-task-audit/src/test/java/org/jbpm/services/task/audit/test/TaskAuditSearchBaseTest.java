@@ -93,12 +93,22 @@ public abstract class TaskAuditSearchBaseTest extends HumanTaskServicesBaseTest 
                 .setPriority(9)
                 .getTask();
     
-     private Task task5 = new TaskFluent().setName("This is my task name keyword")
+    private Task task5 = new TaskFluent().setName("This is my task name keyword")
                 .setDescription("This is my task description keyword")
                 .addPotentialUser("otherUser")
                 .setAdminUser("Administrator")
                 .setProcessId("process definition 2")
                 .setDeploymentId("deployment2")
+                .setPriority(1)
+                .getTask();
+    
+    private Task task6 = new TaskFluent().setName("This is my task name keyword")
+                .setDescription("This is my task description keyword")
+                .addPotentialUser("salaboy")
+                .addPotentialGroup("new group")
+                .setAdminUser("Administrator")
+                .setProcessId("ad-hoc")
+                .setDeploymentId("ad-hoc")
                 .setPriority(1)
                 .getTask();
     
@@ -228,17 +238,39 @@ public abstract class TaskAuditSearchBaseTest extends HumanTaskServicesBaseTest 
     
     @Test
     public void moreComplexFilters(){
+        
+        /// Adding 6 tasks , 5 to salaboy 1 to anotherUser
         taskService.addTask(task0, new HashMap<String, Object>());
         
         taskService.addTask(task1, new HashMap<String, Object>());
 
-        taskService.addTask(task2, new HashMap<String, Object>());
+        Long taskId2 = taskService.addTask(task2, new HashMap<String, Object>());
 
         taskService.addTask(task3, new HashMap<String, Object>());
         
         taskService.addTask(task4, new HashMap<String, Object>());
         
         taskService.addTask(task5, new HashMap<String, Object>());
+        
+        QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(AuditTaskImpl.class).get();
+        
+        Query query = qb.bool().must(qb.keyword().onField("actualOwner").matching("salaboy").createQuery())
+                .must(qb.keyword().onField("status").matching("Reserved").createQuery())
+                .createQuery();
+
+        FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, AuditTaskImpl.class);
+        
+        List results = fullTextQuery.getResultList();
+        
+        Assert.assertEquals(5, results.size());
+        
+        taskService.start(taskId2, "salaboy");
+        
+        taskService.complete(taskId2, "salaboy", null);
+        
+        results = fullTextQuery.getResultList();
+        
+        Assert.assertEquals(4, results.size());
         
         
     
