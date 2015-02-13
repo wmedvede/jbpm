@@ -27,11 +27,17 @@ import javax.persistence.Id;
 import javax.persistence.SequenceGenerator;
 import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
+import org.hibernate.search.annotations.Analyze;
+import org.hibernate.search.annotations.Field;
+import org.hibernate.search.annotations.FieldBridge;
+import org.hibernate.search.annotations.Indexed;
+import org.hibernate.search.bridge.builtin.IntegerBridge;
 
 import org.jbpm.process.audit.event.AuditEvent;
 
 @Entity
 @SequenceGenerator(name="nodeInstanceLogIdSeq", sequenceName="NODE_INST_LOG_ID_SEQ", allocationSize=1)
+@Indexed
 public class NodeInstanceLog implements Serializable, AuditEvent, org.kie.api.runtime.manager.audit.NodeInstanceLog {
    
 	
@@ -41,21 +47,32 @@ public class NodeInstanceLog implements Serializable, AuditEvent, org.kie.api.ru
     @GeneratedValue(strategy = GenerationType.AUTO, generator="nodeInstanceLogIdSeq")
 	private long id;
     
+    @Field(analyze = Analyze.NO)
     private long processInstanceId;
+    
+    @Field(analyze = Analyze.NO)
     private String processId;
     
     @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "log_date")
     private Date date;
     
+    @Field(analyze = Analyze.NO)
+    @FieldBridge(impl = IntegerBridge.class)
     private int type;
+    @Field(analyze = Analyze.NO)
     private String nodeInstanceId;
+    @Field(analyze = Analyze.NO)
     private String nodeId;
+    @Field()
     private String nodeName;
+    @Field(analyze = Analyze.NO)
     private String nodeType;
-    private Long workItemId;    
+    @Field(analyze = Analyze.NO)
+    private Long workItemId;
+    @Field(analyze = Analyze.NO)
     private String connection;
-    
+    @Field(analyze = Analyze.NO)
     private String externalId;
     
     public NodeInstanceLog() {

@@ -28,6 +28,9 @@ import javax.persistence.SequenceGenerator;
 import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
 import javax.persistence.Transient;
+import org.hibernate.search.annotations.Analyze;
+import org.hibernate.search.annotations.Field;
+import org.hibernate.search.annotations.Indexed;
 
 import org.jbpm.process.audit.event.AuditEvent;
 import org.slf4j.Logger;
@@ -35,6 +38,7 @@ import org.slf4j.LoggerFactory;
 
 @Entity
 @SequenceGenerator(name="variableInstanceLogIdSeq", sequenceName="VAR_INST_LOG_ID_SEQ", allocationSize=1)
+@Indexed
 public class VariableInstanceLog implements Serializable, AuditEvent, org.kie.api.runtime.manager.audit.VariableInstanceLog {
     
 	private static final Logger logger = LoggerFactory.getLogger(VariableInstanceLog.class);
@@ -49,22 +53,26 @@ public class VariableInstanceLog implements Serializable, AuditEvent, org.kie.ap
     @GeneratedValue(strategy = GenerationType.AUTO, generator="variableInstanceLogIdSeq")
 	private long id;
     
+    @Field(analyze = Analyze.NO)
     private long processInstanceId;
     
+    @Field(analyze = Analyze.NO)
     private String processId;
     
     @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "log_date")
     private Date date;
     
+    @Field(analyze = Analyze.NO)
     private String variableInstanceId;
     
+    @Field(analyze = Analyze.NO)
     private String variableId;
-    
+    @Field()
     private String value;
-    
+    @Field()
     private String oldValue;
-    
+    @Field(analyze = Analyze.NO)
     private String externalId;
     
 	// constructors

@@ -27,12 +27,18 @@ import javax.persistence.Id;
 import javax.persistence.SequenceGenerator;
 import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
+import org.hibernate.search.annotations.Analyze;
+import org.hibernate.search.annotations.Field;
+import org.hibernate.search.annotations.FieldBridge;
 
 import org.jbpm.process.audit.event.AuditEvent;
 import org.jbpm.process.audit.event.AuditEventBuilder;
 import org.kie.api.runtime.KieRuntime;
+import org.hibernate.search.annotations.Indexed;
+import org.hibernate.search.bridge.builtin.IntegerBridge;
 
 @Entity
+@Indexed
 @SequenceGenerator(name="processInstanceLogIdSeq", sequenceName="PROC_INST_LOG_ID_SEQ", allocationSize=1)
 public class ProcessInstanceLog implements Serializable, AuditEvent, org.kie.api.runtime.manager.audit.ProcessInstanceLog {
     
@@ -42,8 +48,10 @@ public class ProcessInstanceLog implements Serializable, AuditEvent, org.kie.api
     @GeneratedValue(strategy = GenerationType.AUTO, generator="processInstanceLogIdSeq")
 	private long id;
 	
+    @Field
     private long processInstanceId;
     
+    @Field(analyze = Analyze.NO)
     private String processId;
     
     @Temporal(TemporalType.TIMESTAMP)
@@ -55,21 +63,28 @@ public class ProcessInstanceLog implements Serializable, AuditEvent, org.kie.api
     private Date end;
     
     @Column(nullable=true)
+    @Field(analyze = Analyze.NO)
+    @FieldBridge(impl = IntegerBridge.class)
     private Integer status;
     
     @Column(nullable=true)
+    @Field(analyze = Analyze.NO)
     private Long parentProcessInstanceId;
     
     @Column(nullable=true)
+    @Field(analyze = Analyze.NO)
     private String outcome;    
     
     private Long duration;
     
     @Column(name="user_identity")
+    @Field(analyze = Analyze.NO)
     private String identity;    
     
+    @Field(analyze = Analyze.NO)
     private String processVersion;
     
+    @Field()
     private String processName;
    
     /**
@@ -79,8 +94,10 @@ public class ProcessInstanceLog implements Serializable, AuditEvent, org.kie.api
      * <li>The deployment unit Id</li>
      * 
      */
+    @Field(analyze = Analyze.NO)
     private String externalId;
     
+    @Field()
     private String processInstanceDescription;
     
     public ProcessInstanceLog() {

@@ -51,33 +51,34 @@ public class AuditTaskImpl implements Serializable, AuditTask {
     @GeneratedValue(strategy = GenerationType.AUTO, generator="auditIdSeq")
     private Long id;
     
-    @Field(analyze = Analyze.NO)
+    @Field(analyze = Analyze.NO, store = org.hibernate.search.annotations.Store.YES)
     private Long taskId;
-    @Field(analyze = Analyze.NO)
+    @Field(analyze = Analyze.NO, store = org.hibernate.search.annotations.Store.YES)
     private String status;
 
-    @Field
+
+    @Field(analyze = Analyze.NO, store = org.hibernate.search.annotations.Store.YES)
     @DateBridge(resolution = Resolution.HOUR)
     @Temporal(javax.persistence.TemporalType.DATE)
 
     private Date activationTime;
-    @Field()
+    @Field(store = org.hibernate.search.annotations.Store.YES)
     private String name = "";
 
-    @Field()
+    @Field(store = org.hibernate.search.annotations.Store.YES)
     @Boost(0.8f)
     private String description = "";
     
-    @Field()
+    @Field(store = org.hibernate.search.annotations.Store.YES)
     @FieldBridge(impl = IntegerBridge.class)
     @Boost(0.5f)
     private int priority;
     
-    @Field( name = "user")
+    @Field( name = "user", store = org.hibernate.search.annotations.Store.YES)
     private String createdBy ;
     
-    @Field( name = "actualOwner")
 
+    @Field( name = "actualOwner", store = org.hibernate.search.annotations.Store.YES)
     private String actualOwner = "";
     
     @Field
