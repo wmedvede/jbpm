@@ -22,25 +22,17 @@ import java.util.HashMap;
 import java.util.List;
 
 import javax.inject.Inject;
-import org.apache.lucene.queryParser.ParseException;
-import org.apache.lucene.queryParser.QueryParser;
-import org.apache.lucene.search.Query;
-import org.apache.lucene.util.Version;
-import org.hibernate.search.jpa.FullTextEntityManager;
-import org.hibernate.search.jpa.FullTextQuery;
-import org.hibernate.search.query.dsl.QueryBuilder;
+
 
 import org.jbpm.services.task.HumanTaskServicesBaseTest;
 import org.jbpm.services.task.audit.commands.DeleteAuditEventsCommand;
 import org.jbpm.services.task.audit.commands.DeleteBAMTaskSummariesCommand;
 import org.jbpm.services.task.audit.commands.GetAuditEventsCommand;
 import org.jbpm.services.task.audit.commands.GetBAMTaskSummariesCommand;
-import org.jbpm.services.task.audit.impl.model.AuditTaskImpl;
 import org.jbpm.services.task.audit.impl.model.BAMTaskSummaryImpl;
 import org.kie.internal.task.api.AuditTask;
 import org.jbpm.services.task.audit.service.TaskAuditService;
 import org.jbpm.services.task.utils.TaskFluent;
-import org.junit.Assert;
 import org.junit.Test;
 import org.kie.api.task.model.Status;
 import org.kie.api.task.model.Task;
@@ -55,7 +47,7 @@ public abstract class TaskAuditBaseTest extends HumanTaskServicesBaseTest {
     
    
     @Test
-    public void testComplete() throws ParseException {
+    public void testComplete()  {
       
         Task task = new TaskFluent().setName("This is my task name")
                                     .addPotentialGroup("Knights Templer")

@@ -58,6 +58,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import bitronix.tm.resource.jdbc.PoolingDataSource;
+import java.util.HashMap;
+import javax.persistence.Persistence;
+import org.jbpm.kie.services.impl.IndexedRuntimeDataServiceImpl;
 
 public abstract class AbstractBaseTest {
 	
@@ -73,6 +76,7 @@ public abstract class AbstractBaseTest {
 	protected DeploymentService deploymentService;    
 	protected DefinitionService bpmn2Service;
 	protected RuntimeDataService runtimeDataService;
+        protected IndexedRuntimeDataServiceImpl indexedRuntimeDataService;
 	protected ProcessService processService;
 	protected UserTaskService userTaskService;
 	
@@ -118,6 +122,10 @@ public abstract class AbstractBaseTest {
 		((RuntimeDataServiceImpl) runtimeDataService).setIdentityProvider(identityProvider);
 		((RuntimeDataServiceImpl) runtimeDataService).setTaskService(HumanTaskServiceFactory.newTaskServiceConfigurator().entityManagerFactory(emf).getTaskService());
 		((KModuleDeploymentService)deploymentService).setRuntimeDataService(runtimeDataService);
+
+                
+                
+                indexedRuntimeDataService = new IndexedRuntimeDataServiceImpl(emf);
 		
 		// set runtime data service as listener on deployment service
 		((KModuleDeploymentService)deploymentService).addListener(((RuntimeDataServiceImpl) runtimeDataService));

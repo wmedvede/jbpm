@@ -21,6 +21,9 @@ import javax.persistence.SequenceGenerator;
 import javax.persistence.Table;
 import javax.persistence.Temporal;
 import javax.persistence.Version;
+import org.hibernate.search.annotations.Analyze;
+import org.hibernate.search.annotations.Field;
+import org.hibernate.search.annotations.Indexed;
 
 import org.kie.internal.task.api.model.TaskEvent;
 
@@ -30,29 +33,38 @@ import org.kie.internal.task.api.model.TaskEvent;
 @Entity
 @Table(name = "TaskEvent")
 @SequenceGenerator(name = "taskEventIdSeq", sequenceName = "TASK_EVENT_ID_SEQ")
+@Indexed
 public class TaskEventImpl implements TaskEvent, Externalizable {
 
   @Id
   @GeneratedValue(strategy = GenerationType.AUTO, generator = "taskEventIdSeq")
   @Column(name = "id")
+  @Field(analyze = Analyze.NO)
   private Long id;
 
   @Version
   @Column(name = "OPTLOCK")
+  @Field(analyze = Analyze.NO)
   private Integer version;
 
+  @Field(analyze = Analyze.NO)
   private Long taskId;
 
+  @Field(analyze = Analyze.NO)
   private Long workItemId;
 
   @Enumerated(EnumType.STRING)
+  @Field(analyze = Analyze.NO)
   private TaskEventType type;
 
+  @Field(analyze = Analyze.NO)
   private Long processInstanceId;
 
+  @Field(analyze = Analyze.NO)
   private String userId;
 
   @Temporal(javax.persistence.TemporalType.TIMESTAMP)
+  @Field
   private Date logTime;
 
   public TaskEventImpl() {

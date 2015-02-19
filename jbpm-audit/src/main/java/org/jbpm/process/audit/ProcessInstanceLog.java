@@ -29,13 +29,11 @@ import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
 import org.hibernate.search.annotations.Analyze;
 import org.hibernate.search.annotations.Field;
-import org.hibernate.search.annotations.FieldBridge;
 
 import org.jbpm.process.audit.event.AuditEvent;
 import org.jbpm.process.audit.event.AuditEventBuilder;
 import org.kie.api.runtime.KieRuntime;
 import org.hibernate.search.annotations.Indexed;
-import org.hibernate.search.bridge.builtin.IntegerBridge;
 
 @Entity
 @Indexed
@@ -48,23 +46,25 @@ public class ProcessInstanceLog implements Serializable, AuditEvent, org.kie.api
     @GeneratedValue(strategy = GenerationType.AUTO, generator="processInstanceLogIdSeq")
 	private long id;
 	
-    @Field
+    @Field(analyze = Analyze.NO)
     private long processInstanceId;
     
-    @Field(analyze = Analyze.NO)
+    @Field(analyze = Analyze.YES)
     private String processId;
     
     @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "start_date")
+    @Field(analyze = Analyze.NO)
     private Date start;
     
     @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "end_date")
+    @Field(analyze = Analyze.NO)
     private Date end;
     
     @Column(nullable=true)
     @Field(analyze = Analyze.NO)
-    @FieldBridge(impl = IntegerBridge.class)
+  
     private Integer status;
     
     @Column(nullable=true)
@@ -78,7 +78,7 @@ public class ProcessInstanceLog implements Serializable, AuditEvent, org.kie.api
     private Long duration;
     
     @Column(name="user_identity")
-    @Field(analyze = Analyze.NO)
+    @Field(analyze = Analyze.NO, name = "initiator")
     private String identity;    
     
     @Field(analyze = Analyze.NO)

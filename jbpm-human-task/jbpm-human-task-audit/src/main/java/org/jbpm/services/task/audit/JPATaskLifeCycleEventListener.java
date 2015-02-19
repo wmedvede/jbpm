@@ -5,6 +5,8 @@
 package org.jbpm.services.task.audit;
 
 import java.util.Date;
+import java.util.HashSet;
+import java.util.Set;
 
 import javax.persistence.EntityManagerFactory;
 
@@ -14,6 +16,7 @@ import org.jbpm.services.task.lifecycle.listeners.TaskLifeCycleEventListener;
 import org.jbpm.services.task.persistence.PersistableEventListener;
 import org.jbpm.services.task.utils.ClassUtil;
 import org.kie.api.task.TaskEvent;
+import org.kie.api.task.model.OrganizationalEntity;
 import org.kie.api.task.model.Task;
 import org.kie.internal.task.api.TaskContext;
 import org.kie.internal.task.api.TaskPersistenceContext;
@@ -233,6 +236,22 @@ public class JPATaskLifeCycleEventListener extends PersistableEventListener impl
 		}
     }
 
+    protected Set<String> extractPotentialOwners(Task t) {
+        Set<String> sb = new HashSet<String>();
+        for (OrganizationalEntity oe : t.getPeopleAssignments().getPotentialOwners()) {
+            sb.add(oe.getId());
+        }
+        return sb;
+    }
+    
+    protected Set<String> extractBusinessAdministrators(Task t) {
+        Set<String> sb = new HashSet<String>();
+        for (OrganizationalEntity oe : t.getPeopleAssignments().getBusinessAdministrators()) {
+            sb.add(oe.getId());
+        }
+        return sb;
+    }
+    
     @Override
     public void afterTaskAddedEvent(TaskEvent event) {
         String userId = "";
@@ -244,6 +263,9 @@ public class JPATaskLifeCycleEventListener extends PersistableEventListener impl
 	        }else if(ti.getTaskData().getActualOwner() != null){
 	            userId = ti.getTaskData().getActualOwner().getId();
 	        }
+                
+                
+                
 	        AuditTaskImpl auditTaskImpl = new AuditTaskImpl( ti.getId(),ti.getName(),  ti.getTaskData().getStatus().name(),
 	                                                                                ti.getTaskData().getActivationTime() ,
 	                                                                                (ti.getTaskData().getActualOwner() != null)?ti.getTaskData().getActualOwner().getId():"",
@@ -254,7 +276,7 @@ public class JPATaskLifeCycleEventListener extends PersistableEventListener impl
 	                                                                                ti.getTaskData().getProcessId(), ti.getTaskData().getProcessSessionId(),
 	                                                                                ti.getTaskData().getDeploymentId(),
 	                                                                                ti.getTaskData().getParentId(),
-	                                                                                ti.getTaskData().getWorkItemId());
+	                                                                                ti.getTaskData().getWorkItemId(), extractPotentialOwners(ti), extractBusinessAdministrators(ti));
 	        persistenceContext.persist(auditTaskImpl);
 	        //@TODO: Create User or Group Task for Lucene
 	        persistenceContext.persist(new TaskEventImpl(ti.getId(), org.kie.internal.task.api.model.TaskEvent.TaskEventType.ADDED, ti.getTaskData().getProcessInstanceId(), ti.getTaskData().getWorkItemId(), userId));

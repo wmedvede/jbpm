@@ -29,9 +29,7 @@ import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
 import org.hibernate.search.annotations.Analyze;
 import org.hibernate.search.annotations.Field;
-import org.hibernate.search.annotations.FieldBridge;
 import org.hibernate.search.annotations.Indexed;
-import org.hibernate.search.bridge.builtin.IntegerBridge;
 
 import org.jbpm.process.audit.event.AuditEvent;
 
@@ -58,7 +56,6 @@ public class NodeInstanceLog implements Serializable, AuditEvent, org.kie.api.ru
     private Date date;
     
     @Field(analyze = Analyze.NO)
-    @FieldBridge(impl = IntegerBridge.class)
     private int type;
     @Field(analyze = Analyze.NO)
     private String nodeInstanceId;

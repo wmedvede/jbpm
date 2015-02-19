@@ -25,6 +25,7 @@ import javax.inject.Inject;
 import org.apache.lucene.search.Query;
 import org.hibernate.search.jpa.FullTextEntityManager;
 import org.hibernate.search.jpa.FullTextQuery;
+import org.hibernate.search.query.dsl.BooleanJunction;
 import org.hibernate.search.query.dsl.QueryBuilder;
 import org.hibernate.search.query.engine.spi.FacetManager;
 import org.hibernate.search.query.facet.Facet;
@@ -46,7 +47,7 @@ public abstract class TaskAuditSearchBaseTest extends HumanTaskServicesBaseTest 
     @Inject
     protected TaskAuditService taskAuditService;
 
-    protected FullTextEntityManager fullTextEntityManager;
+    protected FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());;
     
     private Task task0 = new TaskFluent().setName("This is my task name")
                 .setDescription("This is my task description keyword")
@@ -107,6 +108,34 @@ public abstract class TaskAuditSearchBaseTest extends HumanTaskServicesBaseTest 
                 .addPotentialUser("salaboy")
                 .addPotentialGroup("new group")
                 .setAdminUser("Administrator")
+                .setProcessId("ad-hoc")
+                .setDeploymentId("ad-hoc")
+                .setPriority(1)
+                .getTask();
+    
+     private Task task7 = new TaskFluent().setName("This is my task name keyword")
+                .setDescription("This is my task description keyword")
+                .addPotentialGroup("Crusaders")
+                .setAdminUser("Administrator")
+                .setProcessId("ad-hoc")
+                .setDeploymentId("ad-hoc")
+                .setPriority(1)
+                .getTask();
+     private Task task8 = new TaskFluent().setName("This is my task name keyword")
+                .setDescription("This is my task description keyword")
+                .addPotentialGroup("Crusaders")
+                .addPotentialGroup("Release Manager")
+                .setAdminUser("Administrator")
+                .setProcessId("ad-hoc")
+                .setDeploymentId("ad-hoc")
+                .setPriority(1)
+                .getTask();
+     private Task task9 = new TaskFluent().setName("This is my task name keyword")
+                .setDescription("This is my task description keyword")
+                .addPotentialGroup("Crusaders")
+                .addPotentialGroup("Release Manager")
+                .setAdminUser("Administrator")
+                .setAdminGroup("Administrators")
                 .setProcessId("ad-hoc")
                 .setDeploymentId("ad-hoc")
                 .setPriority(1)
@@ -254,7 +283,8 @@ public abstract class TaskAuditSearchBaseTest extends HumanTaskServicesBaseTest 
         
         QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(AuditTaskImpl.class).get();
         
-        Query query = qb.bool().must(qb.keyword().onField("actualOwner").matching("salaboy").createQuery())
+        Query query = qb.bool()
+                .must(qb.keyword().onField("actualOwner").matching("salaboy").createQuery())
                 .must(qb.keyword().onField("status").matching("Reserved").createQuery())
                 .createQuery();
 
@@ -274,6 +304,71 @@ public abstract class TaskAuditSearchBaseTest extends HumanTaskServicesBaseTest 
         
         
     
+    }
+    
+    @Test
+    public void potentialOwnersTest(){
+        taskService.addTask(task7, new HashMap<String, Object>());
+        
+        QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(AuditTaskImpl.class).get();
+        
+        BooleanJunction<BooleanJunction> bool = qb.bool();
+                bool.should(qb.keyword().onField("potentialOwners").matching("salaboy").createQuery());
+                bool.should(qb.keyword().onField("potentialOwners").matching("Crusaders").createQuery());
+        Query query = bool.createQuery();
+
+        FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, AuditTaskImpl.class);
+        
+        List results = fullTextQuery.getResultList();
+        
+        Assert.assertEquals(1, results.size());
+        
+        taskService.addTask(task8, new HashMap<String, Object>());
+        
+        qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(AuditTaskImpl.class).get();
+        
+        bool = qb.bool();
+                bool.should(qb.keyword().onField("potentialOwners").matching("salaboy").createQuery());
+                bool.should(qb.keyword().onField("potentialOwners").matching("Crusaders").createQuery());
+        query = bool.createQuery();
+
+        fullTextQuery = fullTextEntityManager.createFullTextQuery(query, AuditTaskImpl.class);
+        
+        results = fullTextQuery.getResultList();
+        
+        Assert.assertEquals(2, results.size());
+    
+    }
+    
+    @Test
+    public void businessAdminsTests(){
+        Long taskId = taskService.addTask(task9, new HashMap<String, Object>());
+        
+        QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(AuditTaskImpl.class).get();
+        
+        BooleanJunction<BooleanJunction> bool = qb.bool();
+                bool.should(qb.keyword().onField("businessAdministrators").matching("Administrator").createQuery());
+                bool.should(qb.keyword().onField("businessAdministrators").matching("Administrators").createQuery());
+        Query query = bool.createQuery();
+
+        FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, AuditTaskImpl.class);
+        
+        List results = fullTextQuery.getResultList();
+        
+        Assert.assertEquals(1, results.size());
+        
+        taskService.claim(taskId, "salaboy");
+        
+        bool = qb.bool();
+                bool.should(qb.keyword().onField("actualOwner").matching("salaboy").createQuery());
+        query = bool.createQuery();
+
+        fullTextQuery = fullTextEntityManager.createFullTextQuery(query, AuditTaskImpl.class);
+        //fullTextQuery.getResultSize();
+        results = fullTextQuery.getResultList();
+        
+        Assert.assertEquals(1, results.size());
+        
     }
     
     

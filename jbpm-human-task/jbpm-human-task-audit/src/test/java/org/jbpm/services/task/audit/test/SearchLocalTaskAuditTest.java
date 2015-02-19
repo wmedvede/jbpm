@@ -51,8 +51,6 @@ public class SearchLocalTaskAuditTest extends TaskAuditSearchBaseTest {
 
         this.taskService = (InternalTaskService) configurator.getTaskService();
 
-        fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
-
         this.taskAuditService = TaskAuditServiceFactory.newTaskAuditServiceConfigurator().setTaskService(taskService).getTaskAuditService();
     }
 

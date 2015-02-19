@@ -18,6 +18,8 @@ package org.jbpm.services.task.audit.impl.model;
 
 import java.io.Serializable;
 import java.util.Date;
+import java.util.Set;
+import javax.persistence.ElementCollection;
 
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
@@ -29,10 +31,10 @@ import org.hibernate.search.annotations.Analyze;
 import org.hibernate.search.annotations.Boost;
 import org.hibernate.search.annotations.DateBridge;
 import org.hibernate.search.annotations.Field;
-import org.hibernate.search.annotations.FieldBridge;
 import org.hibernate.search.annotations.Indexed;
-import org.hibernate.search.annotations.Resolution;
-import org.hibernate.search.bridge.builtin.IntegerBridge;
+import org.hibernate.search.annotations.IndexedEmbedded;
+import org.hibernate.search.annotations.Store;
+
 
 import org.kie.internal.task.api.AuditTask;
 
@@ -51,63 +53,70 @@ public class AuditTaskImpl implements Serializable, AuditTask {
     @GeneratedValue(strategy = GenerationType.AUTO, generator="auditIdSeq")
     private Long id;
     
-    @Field(analyze = Analyze.NO, store = org.hibernate.search.annotations.Store.YES)
+    @Field(analyze = Analyze.NO, store = Store.YES)
     private Long taskId;
-    @Field(analyze = Analyze.NO, store = org.hibernate.search.annotations.Store.YES)
+    @Field(analyze = Analyze.NO, store = Store.YES)
     private String status;
 
-
-    @Field(analyze = Analyze.NO, store = org.hibernate.search.annotations.Store.YES)
-    @DateBridge(resolution = Resolution.HOUR)
+    @Field(analyze = Analyze.NO, store = Store.YES)
     @Temporal(javax.persistence.TemporalType.DATE)
-
     private Date activationTime;
-    @Field(store = org.hibernate.search.annotations.Store.YES)
+    @Field(store = Store.YES)
     private String name = "";
 
-    @Field(store = org.hibernate.search.annotations.Store.YES)
+    @Field(store = Store.YES)
     @Boost(0.8f)
     private String description = "";
     
-    @Field(store = org.hibernate.search.annotations.Store.YES)
-    @FieldBridge(impl = IntegerBridge.class)
+    @Field(store = Store.YES)
     @Boost(0.5f)
     private int priority;
     
-    @Field( name = "user", store = org.hibernate.search.annotations.Store.YES)
+    @Field( name = "createdBy", store =Store.YES)
     private String createdBy ;
     
 
-    @Field( name = "actualOwner", store = org.hibernate.search.annotations.Store.YES)
+    @Field( name = "actualOwner", store = Store.YES)
+
     private String actualOwner = "";
     
-    @Field
-    @DateBridge(resolution = Resolution.HOUR)
+    @Field(store = org.hibernate.search.annotations.Store.YES)        
     @Temporal(javax.persistence.TemporalType.DATE)
+    @DateBridge(resolution = org.hibernate.search.annotations.Resolution.SECOND)
     private Date createdOn;
-    @Field
-    @DateBridge(resolution = Resolution.HOUR)
+    @Field(store = org.hibernate.search.annotations.Store.YES)
     @Temporal(javax.persistence.TemporalType.DATE)
 
     private Date dueDate;
     
-    @Field(analyze = Analyze.NO, name = "processInstance")
-    @FieldBridge(impl = IntegerBridge.class)
+    @Field(analyze = Analyze.NO, store = Store.YES)
     private long processInstanceId;
     
-    @Field(analyze = Analyze.NO, name = "process")
+    @Field(analyze = Analyze.NO, name = "process", store = Store.YES)
     private String processId = "";
     
     
     private long processSessionId;
+    
+    @Field(analyze = Analyze.NO, store = Store.YES)
     private long parentId;
             
 
-    @Field(analyze = Analyze.NO, name = "deployment")
+    @Field(analyze = Analyze.NO, name = "deployment", store = Store.YES)
     private String deploymentId = "";
     
-    @Field(analyze = Analyze.NO)
+    @Field(analyze = Analyze.NO, store = Store.YES)
     private Long workItemId;
+    
+    @Field(analyze = Analyze.NO)
+    @ElementCollection
+    @IndexedEmbedded()
+    private Set<String> potentialOwners;
+    
+    @Field(analyze = Analyze.NO)
+    @ElementCollection
+    @IndexedEmbedded()
+    private Set<String> businessAdministrators;
 
 
     public AuditTaskImpl() {
@@ -116,7 +125,7 @@ public class AuditTaskImpl implements Serializable, AuditTask {
     public AuditTaskImpl(long taskId, String name, String status, Date activationTime, 
             String actualOwner , String description, int priority, String createdBy, 
             Date createdOn, Date dueDate, long processInstanceId, String processId, 
-            long processSessionId, String deploymentId, long parentId, long workItemId) {
+            long processSessionId, String deploymentId, long parentId, long workItemId, Set<String> potentialOwners, Set<String> businessAdministrators) {
         this.taskId = taskId;
         this.status = status;
         this.activationTime = activationTime;
@@ -133,6 +142,8 @@ public class AuditTaskImpl implements Serializable, AuditTask {
         this.deploymentId = deploymentId;
         this.parentId = parentId;
         this.workItemId = workItemId;
+        this.potentialOwners = potentialOwners;
+        this.businessAdministrators = businessAdministrators;
     }
 
     public Long getId() {
@@ -304,4 +315,33 @@ public class AuditTaskImpl implements Serializable, AuditTask {
 		this.workItemId = workItemId;
 	}
 
+    
+
+    public void setTaskId(Long taskId) {
+        this.taskId = taskId;
+    }
+
+
+    public void setWorkItemId(Long workItemId) {
+        this.workItemId = workItemId;
+    }
+
+    public Set<String> getPotentialOwners() {
+        return potentialOwners;
+    }
+
+    public void setPotentialOwners(Set<String> potentialOwners) {
+        this.potentialOwners = potentialOwners;
+    }
+
+    public Set<String> getBusinessAdministrators() {
+        return businessAdministrators;
+    }
+
+    public void setBusinessAdministrators(Set<String> businessAdministrators) {
+        this.businessAdministrators = businessAdministrators;
+    }
+
+  
+        
 }
