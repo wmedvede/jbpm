@@ -34,6 +34,7 @@ import org.jbpm.process.audit.event.AuditEvent;
 import org.jbpm.process.audit.event.AuditEventBuilder;
 import org.kie.api.runtime.KieRuntime;
 import org.hibernate.search.annotations.Indexed;
+import org.hibernate.search.annotations.Store;
 
 @Entity
 @Indexed
@@ -46,29 +47,28 @@ public class ProcessInstanceLog implements Serializable, AuditEvent, org.kie.api
     @GeneratedValue(strategy = GenerationType.AUTO, generator="processInstanceLogIdSeq")
 	private long id;
 	
-    @Field(analyze = Analyze.NO)
+    @Field(analyze = Analyze.NO, store = Store.YES)
     private long processInstanceId;
     
-    @Field(analyze = Analyze.YES)
+    @Field(analyze = Analyze.YES, store = Store.YES)
     private String processId;
     
     @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "start_date")
-    @Field(analyze = Analyze.NO)
+    @Field(analyze = Analyze.NO, store = Store.YES)
     private Date start;
     
     @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "end_date")
-    @Field(analyze = Analyze.NO)
+    @Field(analyze = Analyze.NO, store = Store.YES)
     private Date end;
     
     @Column(nullable=true)
-    @Field(analyze = Analyze.NO)
-  
+    @Field(analyze = Analyze.NO, store = Store.YES)
     private Integer status;
     
     @Column(nullable=true)
-    @Field(analyze = Analyze.NO)
+    @Field(analyze = Analyze.NO, store = Store.YES)
     private Long parentProcessInstanceId;
     
     @Column(nullable=true)
@@ -78,13 +78,13 @@ public class ProcessInstanceLog implements Serializable, AuditEvent, org.kie.api
     private Long duration;
     
     @Column(name="user_identity")
-    @Field(analyze = Analyze.NO, name = "initiator")
+    @Field(analyze = Analyze.NO, store = Store.YES, name = "initiator")
     private String identity;    
     
-    @Field(analyze = Analyze.NO)
+    @Field(analyze = Analyze.NO, store = Store.YES)
     private String processVersion;
     
-    @Field()
+    @Field(store = Store.YES)
     private String processName;
    
     /**
@@ -94,10 +94,10 @@ public class ProcessInstanceLog implements Serializable, AuditEvent, org.kie.api
      * <li>The deployment unit Id</li>
      * 
      */
-    @Field(analyze = Analyze.NO)
+    @Field(analyze = Analyze.NO, store = Store.YES)
     private String externalId;
     
-    @Field()
+    @Field(store = Store.YES)
     private String processInstanceDescription;
     
     public ProcessInstanceLog() {

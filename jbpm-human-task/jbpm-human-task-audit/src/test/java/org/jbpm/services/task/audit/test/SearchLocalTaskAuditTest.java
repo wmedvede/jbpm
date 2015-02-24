@@ -37,7 +37,7 @@ import org.jbpm.services.task.audit.TaskAuditServiceFactory;
 public class SearchLocalTaskAuditTest extends TaskAuditSearchBaseTest {
 
     private PoolingDataSource pds;
-    private EntityManagerFactory emf;
+    
 
     @Before
     public void setup() {
@@ -50,7 +50,7 @@ public class SearchLocalTaskAuditTest extends TaskAuditSearchBaseTest {
                 .listener(new BAMTaskEventListener(true));
 
         this.taskService = (InternalTaskService) configurator.getTaskService();
-
+        
         this.taskAuditService = TaskAuditServiceFactory.newTaskAuditServiceConfigurator().setTaskService(taskService).getTaskAuditService();
     }
 

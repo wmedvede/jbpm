@@ -33,8 +33,6 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.SortField;
 
-import org.hibernate.search.ProjectionConstants;
-
 import org.hibernate.search.jpa.FullTextEntityManager;
 import org.hibernate.search.jpa.FullTextQuery;
 import org.hibernate.search.jpa.Search;
@@ -91,187 +89,228 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
 
     }
 
-    @Override
-    public Collection<ProcessInstanceDesc> getProcessInstances(QueryContext queryContext) {
+    private class BaseProcessInstanceIndexCommand implements IndexCommand {
+
+        @Override
+        public void execute(FullTextQuery fullTextQuery) {
+            fullTextQuery.setProjection("processInstanceId", "processId", "processName", "processVersion",
+                    "status", "externalId", "start", "initiator",
+                    "processInstanceDescription"); //, ProjectionConstants.EXPLANATION, ProjectionConstants.DOCUMENT);
+            fullTextQuery.setResultTransformer(new ProcessInstanceDescResultTransformer());
+        }
+
+    }
+
+    private class GetProcessInstanceIndexCommand extends BaseProcessInstanceIndexCommand {
+
+        @Override
+        public void execute(FullTextQuery fullTextQuery) {
+            List<String> deploymentIdForUser = getDeploymentsForUser();
+            if (deploymentIdForUser != null && !deploymentIdForUser.isEmpty()) {
+                for (String deployment : deploymentIdForUser) {
+                    fullTextQuery.enableFullTextFilter("deployment").setParameter("deployment", deployment);
+                }
+            }
+            super.execute(fullTextQuery);
+
+        }
+    }
+
+    private class GetProcessInstanceByStatus extends GetProcessInstanceIndexCommand {
+
+        private List<Integer> states;
+
+        public GetProcessInstanceByStatus(List<Integer> states) {
+            this.states = states;
+        }
+
+        @Override
+        public void execute(FullTextQuery fullTextQuery) {
+            for (Integer i : states) {
+                fullTextQuery.enableFullTextFilter("status").setParameter("status", i.toString());
+            }
+            super.execute(fullTextQuery);
+
+        }
+    }
+
+    private class GetProcessIntanceByStatusAndInitiator extends GetProcessInstanceByStatus {
+
+        private String initiator;
+
+        public GetProcessIntanceByStatusAndInitiator(List<Integer> states, String initiator) {
+            super(states);
+            this.initiator = initiator;
+        }
+
+        @Override
+        public void execute(FullTextQuery fullTextQuery) {
+            fullTextQuery.enableFullTextFilter("initiator").setParameter("initiator", initiator);
+            super.execute(fullTextQuery);
+
+        }
+    }
+
+    private class GetProcessInstanceByProcessNameAndStatus extends GetProcessInstanceByStatus {
+
+        private String processName;
+
+        public GetProcessInstanceByProcessNameAndStatus(String processName, List<Integer> states) {
+            super(states);
+            this.processName = processName;
+        }
+
+        @Override
+        public void execute(FullTextQuery fullTextQuery) {
+            fullTextQuery.enableFullTextFilter("processName").setParameter("processName", processName);
+            super.execute(fullTextQuery);
+
+        }
+    }
+
+    private class GetProcessInstanceByProcessIdStatusAndInitiator extends GetProcessIntanceByStatusAndInitiator {
+
+        private String processId;
+
+        public GetProcessInstanceByProcessIdStatusAndInitiator(String processId, List<Integer> states, String initiator) {
+            super(states, initiator);
+            this.processId = processId;
+        }
+
+        @Override
+        public void execute(FullTextQuery fullTextQuery) {
+
+            fullTextQuery.enableFullTextFilter("processId").setParameter("processId", processId);
+            super.execute(fullTextQuery);
+
+        }
+    }
+
+    private class GetProcessInstanceByDeploymentAndStatus extends GetProcessInstanceByStatus {
+
+        private String deploymentId;
+
+        public GetProcessInstanceByDeploymentAndStatus(String deploymentId, List<Integer> states) {
+            super(states);
+            this.deploymentId = deploymentId;
+        }
+
+        @Override
+        public void execute(FullTextQuery fullTextQuery) {
+            fullTextQuery.enableFullTextFilter("deployment").setParameter("deploymentId", deploymentId);
+            super.execute(fullTextQuery);
+
+        }
+
+    }
+
+    private class GetProcessInstanceByProcessNameStatusAndInitiator extends GetProcessIntanceByStatusAndInitiator {
+
+        private String processName;
+
+        public GetProcessInstanceByProcessNameStatusAndInitiator(String processName, List<Integer> states, String initiator) {
+            super(states, initiator);
+            this.processName = processName;
+        }
+
+        @Override
+        public void execute(FullTextQuery fullTextQuery) {
+            fullTextQuery.enableFullTextFilter("processName").setParameter("processName", processName);
+            super.execute(fullTextQuery);
+
+        }
+
+    }
+
+    private class GetProcessInstanceByProcessName extends GetProcessInstanceIndexCommand {
+
+        private String processName;
+
+        public GetProcessInstanceByProcessName(String processName) {
+            super();
+            this.processName = processName;
+        }
+
+        @Override
+        public void execute(FullTextQuery fullTextQuery) {
+            fullTextQuery.enableFullTextFilter("processName").setParameter("processName", processName);
+            super.execute(fullTextQuery);
+
+        }
+
+    }
+
+    protected List executeQueryAgainstIndex(Class entity, QueryContext queryContext, String keyword, String[] fields, IndexCommand cmd) {
         FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
         try {
-            QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(ProcessInstanceLog.class).get();
-
-            // Apply query filters 
-            Query filters = applyDeploymentFilter(qb);
-            BooleanJunction<BooleanJunction> bool = qb.bool();
-
-            if (filters != null) {
-                bool.must(filters);
+            QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(entity).get();
+            Query query;
+            if (keyword != null && !keyword.isEmpty() && fields.length > 0) {
+                String matching;
+                if (keyword.contains("%")) {
+                    matching = keyword.replace("%", "*");
+                } else {
+                    matching = keyword;
+                }
+                query = qb.keyword().onFields(fields).matching(matching).createQuery();
+            } else {
+                query = qb.all().createQuery();
             }
-            Query query = bool.must(qb.all().createQuery()).createQuery();
+            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, entity);
 
-            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, ProcessInstanceLog.class);
-            //Apply Pagination & Sort Here
+            cmd.execute(fullTextQuery);
             applyQueryContext(fullTextQuery, queryContext);
 
-            List<ProcessInstanceLog> processInstanceLogs = fullTextQuery.getResultList();
-
-            // Just because of the interface I need to translate ProcessInstanceLog to ProcessInstanceDesc
-            return ProcessInstanceDescHelper.adaptCollection(processInstanceLogs);
+            return fullTextQuery.getResultList();
         } finally {
             fullTextEntityManager.close();
         }
+    }
 
+    @Override
+    public Collection<ProcessInstanceDesc> getProcessInstances(QueryContext queryContext) {
+        return executeQueryAgainstIndex(ProcessInstanceLog.class, queryContext, "", new String[]{},
+                new GetProcessInstanceIndexCommand());
     }
 
     @Override
     public Collection<ProcessInstanceDesc> getProcessInstances(List<Integer> states, String initiator, QueryContext queryContext) {
-        FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
-        try {
-            QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(ProcessInstanceLog.class).get();
-
-            // Apply query filters 
-            Query filters = applyDeploymentFilter(qb);
-
-            BooleanJunction<BooleanJunction> bool = qb.bool();
-
-            if (filters != null) {
-                bool.must(filters);
-            }
-            if (initiator != null) {
-                bool.must(qb.keyword().onField("initiator").matching(initiator).createQuery());
-            }
-            for (Integer state : states) {
-                bool.must(qb.keyword().onField("status").matching(state).createQuery());
-            }
-            Query query = bool.createQuery();
-
-            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, ProcessInstanceLog.class);
-            //Apply Pagination & Sort Here
-            applyQueryContext(fullTextQuery, queryContext);
-
-            List<ProcessInstanceLog> processInstanceLogs = fullTextQuery.getResultList();
-            // Just because of the interface I need to translate ProcessInstanceLog to ProcessInstanceDesc
-
-            return ProcessInstanceDescHelper.adaptCollection(processInstanceLogs);
-        } finally {
-            fullTextEntityManager.close();
-        }
+        return executeQueryAgainstIndex(ProcessInstanceLog.class, queryContext, "", new String[]{},
+                new GetProcessIntanceByStatusAndInitiator(states, initiator));
     }
 
     @Override
     public Collection<ProcessInstanceDesc> getProcessInstancesByProcessId(List<Integer> states, String processId, String initiator, QueryContext queryContext) {
-        FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
-        try {
-            QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(ProcessInstanceLog.class).get();
-
-            // Apply query filters 
-            Query filters = applyDeploymentFilter(qb);
-
-            BooleanJunction<BooleanJunction> bool = qb.bool();
-
-            if (filters != null) {
-                bool.must(filters);
-            }
-            if (initiator != null) {
-                bool.must(qb.keyword().onField("initiator").matching(initiator).createQuery());
-            }
-            for (Integer state : states) {
-                bool.must(qb.keyword().onField("status").matching(state).createQuery());
-            }
-            if (processId != null && processId.contains("%")) {
-                String wildcardReplaced = processId.replace("%", "*");
-                bool.must(qb.keyword().wildcard().onField("processId").matching(wildcardReplaced).createQuery());
-            } else {
-                bool.must(qb.keyword().onField("processId").matching(processId).createQuery());
-            }
-            Query query = bool.createQuery();
-
-            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, ProcessInstanceLog.class);
-            //Apply Pagination & Sort Here
-            applyQueryContext(fullTextQuery, queryContext);
-
-            List<ProcessInstanceLog> processInstanceLogs = fullTextQuery.getResultList();
-            // Just because of the interface I need to translate ProcessInstanceLog to ProcessInstanceDesc
-
-            return ProcessInstanceDescHelper.adaptCollection(processInstanceLogs);
-        } finally {
-            fullTextEntityManager.close();
-        }
+        return executeQueryAgainstIndex(ProcessInstanceLog.class, queryContext, "", new String[]{},
+                new GetProcessInstanceByProcessIdStatusAndInitiator(processId, states, initiator));
     }
 
     @Override
     public Collection<ProcessInstanceDesc> getProcessInstancesByProcessName(List<Integer> states, String processName, String initiator, QueryContext queryContext) {
-        FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
-        try {
-            QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(ProcessInstanceLog.class).get();
-
-            // Apply query filters 
-            Query filters = applyDeploymentFilter(qb);
-
-            BooleanJunction<BooleanJunction> bool = qb.bool();
-
-            if (filters != null) {
-                bool.must(filters);
-            }
-            if (initiator != null) {
-                bool.must(qb.keyword().onField("initiator").matching(initiator).createQuery());
-            }
-            for (Integer state : states) {
-                bool.must(qb.keyword().onField("status").matching(state).createQuery());
-            }
-            if (processName != null && processName.contains("%")) {
-                String replacedWildcard = processName.replace("%", "*");
-                bool.must(qb.keyword().wildcard().onField("processName").matching(replacedWildcard).createQuery());
-            } else {
-                bool.must(qb.keyword().onField("processName").matching(processName).createQuery());
-            }
-            Query query = bool.createQuery();
-
-            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, ProcessInstanceLog.class);
-            //Apply Pagination & Sort Here
-            applyQueryContext(fullTextQuery, queryContext);
-
-            List<ProcessInstanceLog> processInstanceLogs = fullTextQuery.getResultList();
-            // Just because of the interface I need to translate ProcessInstanceLog to ProcessInstanceDesc
-
-            return ProcessInstanceDescHelper.adaptCollection(processInstanceLogs);
-        } finally {
-            fullTextEntityManager.close();
-        }
+        return executeQueryAgainstIndex(ProcessInstanceLog.class, queryContext, "", new String[]{},
+                new GetProcessInstanceByProcessNameStatusAndInitiator(processName, states, initiator));
     }
 
     @Override
     public Collection<ProcessInstanceDesc> getProcessInstancesByDeploymentId(String deploymentId, List<Integer> states, QueryContext queryContext) {
-        FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
-        try {
-            QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(ProcessInstanceLog.class).get();
-
-            // Apply query filters 
-            Query filters = applyDeploymentFilter(qb);
-
-            BooleanJunction<BooleanJunction> bool = qb.bool();
-
-            if (filters != null) {
-                bool.must(filters);
-            }
-
-            bool.must(qb.keyword().onField("externalId").matching(deploymentId).createQuery());
-            for (Integer state : states) {
-                bool.must(qb.keyword().onField("status").matching(state).createQuery());
-            }
-            Query query = bool.createQuery();
-
-            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, ProcessInstanceLog.class);
-            //Apply Pagination & Sort Here
-            applyQueryContext(fullTextQuery, queryContext);
-
-            List<ProcessInstanceLog> processInstanceLogs = fullTextQuery.getResultList();
-            // Just because of the interface I need to translate ProcessInstanceLog to ProcessInstanceDesc
-
-            return ProcessInstanceDescHelper.adaptCollection(processInstanceLogs);
-        } finally {
-            fullTextEntityManager.close();
-        }
+        return executeQueryAgainstIndex(ProcessInstanceLog.class, queryContext, "", new String[]{},
+                new GetProcessInstanceByDeploymentAndStatus(deploymentId, states));
     }
 
     @Override
+    public Collection<ProcessInstanceDesc> getProcessInstancesByProcessDefinition(String processDefId, QueryContext queryContext) {
+        return executeQueryAgainstIndex(ProcessInstanceLog.class, queryContext, "", new String[]{},
+                new GetProcessInstanceByProcessName(processDefId));
+    }
+
+    @Override
+    public Collection<ProcessInstanceDesc> getProcessInstancesByProcessDefinition(String processDefId, List<Integer> states, QueryContext queryContext) {
+        return executeQueryAgainstIndex(ProcessInstanceLog.class, queryContext, "", new String[]{},
+                new GetProcessInstanceByProcessNameAndStatus(processDefId, states));
+    }
+
+    @Override
+    // This one should be done with queries to the DB which should be more efficient than the index because it is a query by ID
     public ProcessInstanceDesc getProcessInstanceById(long processInstanceId) {
         FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
         try {
@@ -318,70 +357,6 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
     }
 
     @Override
-    public Collection<ProcessInstanceDesc> getProcessInstancesByProcessDefinition(String processDefId, QueryContext queryContext) {
-        FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
-        try {
-            QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(ProcessInstanceLog.class).get();
-
-            // Apply query filters 
-            Query filters = applyDeploymentFilter(qb);
-
-            BooleanJunction<BooleanJunction> bool = qb.bool();
-
-            if (filters != null) {
-                bool.must(filters);
-            }
-            Query query = bool.must(qb.keyword().onField("processId").matching(processDefId).createQuery())
-                    .createQuery();
-
-            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, ProcessInstanceLog.class);
-            //Apply Pagination & Sort Here
-            applyQueryContext(fullTextQuery, queryContext);
-
-            List<ProcessInstanceLog> processInstanceLogs = fullTextQuery.getResultList();
-            // Just because of the interface I need to translate ProcessInstanceLog to ProcessInstanceDesc
-
-            return ProcessInstanceDescHelper.adaptCollection(processInstanceLogs);
-        } finally {
-            fullTextEntityManager.close();
-        }
-    }
-
-    @Override
-    public Collection<ProcessInstanceDesc> getProcessInstancesByProcessDefinition(String processDefId, List<Integer> states, QueryContext queryContext) {
-        FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
-        try {
-            QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(ProcessInstanceLog.class).get();
-
-            // Apply query filters 
-            Query filters = applyDeploymentFilter(qb);
-
-            BooleanJunction<BooleanJunction> bool = qb.bool();
-
-            if (filters != null) {
-                bool.must(filters);
-            }
-
-            bool.must(qb.keyword().onField("processId").matching(processDefId).createQuery());
-            for (Integer state : states) {
-                bool.must(qb.keyword().onField("status").matching(state).createQuery());
-            }
-            Query query = bool.createQuery();
-
-            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, ProcessInstanceLog.class);
-            //Apply Pagination & Sort Here
-            applyQueryContext(fullTextQuery, queryContext);
-
-            List<ProcessInstanceLog> processInstanceLogs = fullTextQuery.getResultList();
-            // Just because of the interface I need to translate ProcessInstanceLog to ProcessInstanceDesc
-
-            return ProcessInstanceDescHelper.adaptCollection(processInstanceLogs);
-        } finally {
-            fullTextEntityManager.close();
-        }
-    }
-
-    @Override
     public NodeInstanceDesc getNodeInstanceForWorkItem(Long workItemId) {
         FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
         try {
@@ -392,7 +367,7 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
             Query query = bool.must(qb.keyword().onField("workItemId").matching(workItemId).createQuery())
                     .createQuery();
 
-            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, ProcessInstanceLog.class);
+            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, NodeInstanceLog.class);
 
             NodeInstanceLog nodeInstanceLog = (NodeInstanceLog) fullTextQuery.getSingleResult();
             // Just because of the interface I need to translate ProcessInstanceLog to ProcessInstanceDesc
@@ -429,7 +404,7 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
 
             Query query = bool.createQuery();
 
-            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, ProcessInstanceLog.class);
+            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, NodeInstanceLog.class);
             //Apply Pagination & Sort Here
             applyQueryContext(fullTextQuery, queryContext);
 
@@ -454,7 +429,7 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
 
             Query query = bool.createQuery();
 
-            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, ProcessInstanceLog.class);
+            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, NodeInstanceLog.class);
             //Apply Pagination & Sort Here
             applyQueryContext(fullTextQuery, queryContext);
 
@@ -479,7 +454,7 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
             bool.must(qb.keyword().onField("type").matching(type).createQuery());
             Query query = bool.createQuery();
 
-            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, ProcessInstanceLog.class);
+            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, NodeInstanceLog.class);
             //Apply Pagination & Sort Here
             applyQueryContext(fullTextQuery, queryContext);
 
@@ -503,7 +478,7 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
             bool.must(qb.keyword().onField("processInstanceId").matching(processInstanceId).createQuery());
             Query query = bool.createQuery();
 
-            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, ProcessInstanceLog.class);
+            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, VariableInstanceLog.class);
 
             List<VariableInstanceLog> variableLogs = fullTextQuery.getResultList();
             // Just because of the interface I need to translate ProcessInstanceLog to ProcessInstanceDesc
@@ -526,7 +501,9 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
             bool.must(qb.keyword().onField("variableId").matching(variableId).createQuery());
             Query query = bool.createQuery();
 
-            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, ProcessInstanceLog.class);
+            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, VariableInstanceLog.class);
+            //Apply Pagination & Sort Here
+            applyQueryContext(fullTextQuery, queryContext);
 
             List<VariableInstanceLog> variableLogs = fullTextQuery.getResultList();
             // Just because of the interface I need to translate ProcessInstanceLog to ProcessInstanceDesc
@@ -658,7 +635,7 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
             BooleanJunction<BooleanJunction> bool = qb.bool();
             Map<String, Object> params = filter.getParams();
             //Get the parameters from the query filter and create filter for()
-            for(String key : params.keySet()){
+            for (String key : params.keySet()) {
                 bool.must(qb.keyword().onField(key).matching(params.get(key)).createQuery());
             }
 
@@ -671,18 +648,10 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
 
             fullTextQuery.setProjection("taskId", "name", "description", "status",
                     "priority", "actualOwner", "createdBy", "createdOn", "activationTime",
-                    "dueDate", "process", "processInstanceId", "parentId", "deployent", ProjectionConstants.EXPLANATION,
-                    ProjectionConstants.DOCUMENT);//.setResultTransformer();
-            List result = fullTextQuery.getResultList();
-            List<TaskSummary> summaries = new ArrayList<TaskSummary>(result.size());
-            for (Object o : result) {
-                Object[] oa = (Object[]) o;
-                summaries.add(new org.jbpm.services.task.query.TaskSummaryImpl((Long) oa[0], (String) oa[1], (String) oa[2], Status.valueOf((String) oa[3]), (Integer) oa[4], (String) oa[5],
-                        (String) oa[6], (Date) oa[7], (Date) oa[8], (Date) oa[9], (String) oa[10], (Long) oa[11], (Long) oa[12], (String) oa[13]));
-                System.out.println("Explanation: " + oa[14]);
-                System.out.println("Document: " + oa[15]);
-            }
-            return summaries;
+                    "dueDate", "process", "processInstanceId", "parentId", "deployent"); //, ProjectionConstants.EXPLANATION, ProjectionConstants.DOCUMENT);
+            fullTextQuery.setResultTransformer(new TaskSummaryResultTransformer());
+
+            return (List<TaskSummary>) fullTextQuery.getResultList();
         } finally {
             fullTextEntityManager.close();
         }
@@ -710,15 +679,9 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
 
             fullTextQuery.setProjection("taskId", "name", "description", "status",
                     "priority", "actualOwner", "createdBy", "createdOn", "activationTime",
-                    "dueDate", "process", "processInstanceId", "parentId", "deployent");
-            List result = fullTextQuery.getResultList();
-            List<TaskSummary> summaries = new ArrayList<TaskSummary>(result.size());
-            for (Object o : result) {
-                Object[] oa = (Object[]) o;
-                summaries.add(new org.jbpm.services.task.query.TaskSummaryImpl((Long) oa[0], (String) oa[1], (String) oa[2], Status.valueOf((String) oa[3]), (Integer) oa[4], (String) oa[5],
-                        (String) oa[6], (Date) oa[7], (Date) oa[8], (Date) oa[9], (String) oa[10], (Long) oa[11], (Long) oa[12], (String) oa[13]));
-            }
-            return summaries;
+                    "dueDate", "process", "processInstanceId", "parentId", "deployent"); //, ProjectionConstants.EXPLANATION, ProjectionConstants.DOCUMENT);
+            fullTextQuery.setResultTransformer(new TaskSummaryResultTransformer());
+            return (List<TaskSummary>) fullTextQuery.getResultList();
         } finally {
             fullTextEntityManager.close();
         }
@@ -749,16 +712,9 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
             FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, AuditTaskImpl.class);
             fullTextQuery.setProjection("taskId", "name", "description", "status",
                     "priority", "actualOwner", "createdBy", "createdOn", "activationTime",
-                    "dueDate", "process", "processInstanceId", "parentId", "deployent");
-            applyQueryContext(fullTextQuery, filter);
-            List result = fullTextQuery.getResultList();
-            List<TaskSummary> summaries = new ArrayList<TaskSummary>(result.size());
-            for (Object o : result) {
-                Object[] oa = (Object[]) o;
-                summaries.add(new org.jbpm.services.task.query.TaskSummaryImpl((Long) oa[0], (String) oa[1], (String) oa[2], Status.valueOf((String) oa[3]), (Integer) oa[4], (String) oa[5],
-                        (String) oa[6], (Date) oa[7], (Date) oa[8], (Date) oa[9], (String) oa[10], (Long) oa[11], (Long) oa[12], (String) oa[13]));
-            }
-            return summaries;
+                    "dueDate", "process", "processInstanceId", "parentId", "deployent"); //, ProjectionConstants.EXPLANATION, ProjectionConstants.DOCUMENT);
+            fullTextQuery.setResultTransformer(new TaskSummaryResultTransformer());
+            return (List<TaskSummary>) fullTextQuery.getResultList();
         } finally {
             fullTextEntityManager.close();
         }
@@ -778,32 +734,27 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
         try {
             QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(AuditTaskImpl.class).get();
 
-            BooleanJunction<BooleanJunction> bool = qb.bool();
-            if (status != null && !status.isEmpty()) {
-                for (Status st : status) {
-                    bool.should(qb.keyword().onField("status").matching(st.toString()).createQuery());
-                }
-            }
-            bool.must(qb.keyword().onField("potentialOwners").matching(userId).createQuery());
-            if (groupIds != null && !groupIds.isEmpty()) {
-                String groupIdsString = extractGroupIdsString(groupIds);
-                bool.must(qb.keyword().onField("potentialOwners").matching(groupIdsString).createQuery());
-            }
-
-            Query query = bool.createQuery();
+            Query query = qb.all().createQuery();
 
             FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, AuditTaskImpl.class);
+            if (status != null && !status.isEmpty()) {
+                for (Status s : status) {
+                    fullTextQuery.enableFullTextFilter("status").setParameter("status", s.toString());
+                }
+            }
+            List<String> potentialOwners = new ArrayList<String>();
+            potentialOwners.add(userId);
+            potentialOwners.addAll(groupIds);
+
+            for(String potentialOwner : potentialOwners){
+                fullTextQuery.enableFullTextFilter("potentialOwner").setParameter("potentialOwner", potentialOwner);
+            }
+
             fullTextQuery.setProjection("taskId", "name", "description", "status",
                     "priority", "actualOwner", "createdBy", "createdOn", "activationTime",
-                    "dueDate", "process", "processInstanceId", "parentId", "deployent");
-            List result = fullTextQuery.getResultList();
-            List<TaskSummary> summaries = new ArrayList<TaskSummary>(result.size());
-            for (Object o : result) {
-                Object[] oa = (Object[]) o;
-                summaries.add(new org.jbpm.services.task.query.TaskSummaryImpl((Long) oa[0], (String) oa[1], (String) oa[2], Status.valueOf((String) oa[3]), (Integer) oa[4], (String) oa[5],
-                        (String) oa[6], (Date) oa[7], (Date) oa[8], (Date) oa[9], (String) oa[10], (Long) oa[11], (Long) oa[12], (String) oa[13]));
-            }
-            return summaries;
+                    "dueDate", "process", "processInstanceId", "parentId", "deployent"); //, ProjectionConstants.EXPLANATION, ProjectionConstants.DOCUMENT);
+            fullTextQuery.setResultTransformer(new TaskSummaryResultTransformer());
+            return (List<TaskSummary>) fullTextQuery.getResultList();
         } finally {
             fullTextEntityManager.close();
         }
@@ -825,24 +776,18 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
         try {
             QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(AuditTaskImpl.class).get();
 
-            BooleanJunction<BooleanJunction> bool = qb.bool();
-
-            bool.must(qb.keyword().onField("actualOwner").matching(userId).createQuery());
-
-            Query query = bool.createQuery();
+            Query query = qb.all().createQuery();
 
             FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, AuditTaskImpl.class);
+
+            fullTextQuery.enableFullTextFilter("owner").setParameter("owner", userId);
+            applyQueryContext(fullTextQuery, filter);
+
             fullTextQuery.setProjection("taskId", "name", "description", "status",
                     "priority", "actualOwner", "createdBy", "createdOn", "activationTime",
-                    "dueDate", "process", "processInstanceId", "parentId", "deployent");
-            List result = fullTextQuery.getResultList();
-            List<TaskSummary> summaries = new ArrayList<TaskSummary>(result.size());
-            for (Object o : result) {
-                Object[] oa = (Object[]) o;
-                summaries.add(new org.jbpm.services.task.query.TaskSummaryImpl((Long) oa[0], (String) oa[1], (String) oa[2], Status.valueOf((String) oa[3]), (Integer) oa[4], (String) oa[5],
-                        (String) oa[6], (Date) oa[7], (Date) oa[8], (Date) oa[9], (String) oa[10], (Long) oa[11], (Long) oa[12], (String) oa[13]));
-            }
-            return summaries;
+                    "dueDate", "process", "processInstanceId", "parentId", "deployent"); //, ProjectionConstants.EXPLANATION, ProjectionConstants.DOCUMENT);
+            fullTextQuery.setResultTransformer(new TaskSummaryResultTransformer());
+            return (List<TaskSummary>) fullTextQuery.getResultList();
         } finally {
             fullTextEntityManager.close();
         }
@@ -850,7 +795,29 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
 
     @Override
     public List<TaskSummary> getTasksOwnedByStatus(String userId, List<Status> status, QueryFilter filter) {
-        throw new UnsupportedOperationException("This method wasn't implemented against the audit logs"); //To change body of generated methods, choose Tools | Templates.
+        FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
+        try {
+            QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(AuditTaskImpl.class).get();
+
+            Query query = qb.all().createQuery();
+
+            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, AuditTaskImpl.class);
+            if (status != null && !status.isEmpty()) {
+                for(Status s : status){
+                    fullTextQuery.enableFullTextFilter("status").setParameter("status", s.toString());
+                }
+            }
+            fullTextQuery.enableFullTextFilter("owner").setParameter("owner", userId);
+            applyQueryContext(fullTextQuery, filter);
+
+            fullTextQuery.setProjection("taskId", "name", "description", "status",
+                    "priority", "actualOwner", "createdBy", "createdOn", "activationTime",
+                    "dueDate", "process", "processInstanceId", "parentId", "deployent"); //, ProjectionConstants.EXPLANATION, ProjectionConstants.DOCUMENT);
+            fullTextQuery.setResultTransformer(new TaskSummaryResultTransformer());
+            return (List<TaskSummary>) fullTextQuery.getResultList();
+        } finally {
+            fullTextEntityManager.close();
+        }
     }
 
     @Override

@@ -22,9 +22,11 @@ import java.util.HashMap;
 import java.util.List;
 
 import javax.inject.Inject;
+import javax.persistence.EntityManagerFactory;
 import org.apache.lucene.search.Query;
 import org.hibernate.search.jpa.FullTextEntityManager;
 import org.hibernate.search.jpa.FullTextQuery;
+import org.hibernate.search.jpa.Search;
 import org.hibernate.search.query.dsl.BooleanJunction;
 import org.hibernate.search.query.dsl.QueryBuilder;
 import org.hibernate.search.query.engine.spi.FacetManager;
@@ -47,7 +49,7 @@ public abstract class TaskAuditSearchBaseTest extends HumanTaskServicesBaseTest 
     @Inject
     protected TaskAuditService taskAuditService;
 
-    protected FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());;
+    protected EntityManagerFactory emf;
     
     private Task task0 = new TaskFluent().setName("This is my task name")
                 .setDescription("This is my task description keyword")
@@ -158,7 +160,7 @@ public abstract class TaskAuditSearchBaseTest extends HumanTaskServicesBaseTest 
         long totalAudit = afterAudit - beforeAudit;
         System.out.println("Total Audit: " + totalAudit);
         assertEquals(3, allHistoryAuditTasks.size());
-        
+        FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
         Assert.assertNotNull(fullTextEntityManager);
         
         QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(AuditTaskImpl.class).get();
@@ -186,6 +188,8 @@ public abstract class TaskAuditSearchBaseTest extends HumanTaskServicesBaseTest 
         System.out.println("Total Search: " + totalSearch);
         
         Assert.assertEquals(3, resultList.size());
+        fullTextEntityManager.close();
+    
     }
     
      @Test
@@ -202,7 +206,7 @@ public abstract class TaskAuditSearchBaseTest extends HumanTaskServicesBaseTest 
         taskService.addTask(task4, new HashMap<String, Object>());
         
         taskService.addTask(task5, new HashMap<String, Object>());
-        
+        FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
         QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(AuditTaskImpl.class).get();
         
         FacetingRequest processFacetingRequest = qb.facet()
@@ -262,7 +266,7 @@ public abstract class TaskAuditSearchBaseTest extends HumanTaskServicesBaseTest 
         Assert.assertTrue(deploymentFacets.get(2).getFacetingName().equals("deploymentFacet"));
         Assert.assertTrue(deploymentFacets.get(2).getValue().equals("ad-hoc"));
         Assert.assertTrue(deploymentFacets.get(2).getCount() == 1);
-        
+        fullTextEntityManager.close();
     }
     
     @Test
@@ -281,6 +285,7 @@ public abstract class TaskAuditSearchBaseTest extends HumanTaskServicesBaseTest 
         
         taskService.addTask(task5, new HashMap<String, Object>());
         
+        FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
         QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(AuditTaskImpl.class).get();
         
         Query query = qb.bool()
@@ -302,14 +307,14 @@ public abstract class TaskAuditSearchBaseTest extends HumanTaskServicesBaseTest 
         
         Assert.assertEquals(4, results.size());
         
-        
+        fullTextEntityManager.close();
     
     }
     
     @Test
     public void potentialOwnersTest(){
         taskService.addTask(task7, new HashMap<String, Object>());
-        
+        FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
         QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(AuditTaskImpl.class).get();
         
         BooleanJunction<BooleanJunction> bool = qb.bool();
@@ -337,13 +342,15 @@ public abstract class TaskAuditSearchBaseTest extends HumanTaskServicesBaseTest 
         results = fullTextQuery.getResultList();
         
         Assert.assertEquals(2, results.size());
+        
+        fullTextEntityManager.close();
     
     }
     
     @Test
     public void businessAdminsTests(){
         Long taskId = taskService.addTask(task9, new HashMap<String, Object>());
-        
+        FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
         QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(AuditTaskImpl.class).get();
         
         BooleanJunction<BooleanJunction> bool = qb.bool();
@@ -368,7 +375,7 @@ public abstract class TaskAuditSearchBaseTest extends HumanTaskServicesBaseTest 
         results = fullTextQuery.getResultList();
         
         Assert.assertEquals(1, results.size());
-        
+        fullTextEntityManager.close();
     }
     
     

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.jbpm.services.task.audit.impl.model;
 
 import java.io.Serializable;
@@ -31,10 +30,19 @@ import org.hibernate.search.annotations.Analyze;
 import org.hibernate.search.annotations.Boost;
 import org.hibernate.search.annotations.DateBridge;
 import org.hibernate.search.annotations.Field;
+import org.hibernate.search.annotations.FullTextFilterDef;
+import org.hibernate.search.annotations.FullTextFilterDefs;
 import org.hibernate.search.annotations.Indexed;
 import org.hibernate.search.annotations.IndexedEmbedded;
 import org.hibernate.search.annotations.Store;
-
+import org.jbpm.services.task.audit.impl.filters.BusinessAdministratorFilterFactory;
+import org.jbpm.services.task.audit.impl.filters.DeploymentFilterFactory;
+import org.jbpm.services.task.audit.impl.filters.ProcessDefinitionIdFilterFactory;
+import org.jbpm.services.task.audit.impl.filters.OwnerFilterFactory;
+import org.jbpm.services.task.audit.impl.filters.PotentialOwnerFilterFactory;
+import org.jbpm.services.task.audit.impl.filters.ProcessDefinitionNameFilterFactory;
+import org.jbpm.services.task.audit.impl.filters.ProcessInstanceInitiatorFilterFactory;
+import org.jbpm.services.task.audit.impl.filters.StatusFilterFactory;
 
 import org.kie.internal.task.api.AuditTask;
 
@@ -44,15 +52,26 @@ import org.kie.internal.task.api.AuditTask;
  */
 @Entity
 @Indexed
-@SequenceGenerator(name="auditIdSeq", sequenceName="AUDIT_ID_SEQ", allocationSize=1)
+@SequenceGenerator(name = "auditIdSeq", sequenceName = "AUDIT_ID_SEQ", allocationSize = 1)
+@FullTextFilterDefs({
+    @FullTextFilterDef(name = "processId", impl = ProcessDefinitionIdFilterFactory.class),
+    @FullTextFilterDef(name = "processName", impl = ProcessDefinitionNameFilterFactory.class),
+    @FullTextFilterDef(name = "initiator", impl = ProcessInstanceInitiatorFilterFactory.class),
+    @FullTextFilterDef(name = "owner", impl = OwnerFilterFactory.class),
+    @FullTextFilterDef(name = "potentialOwner", impl = PotentialOwnerFilterFactory.class),
+    @FullTextFilterDef(name = "businessAdministrator", impl = BusinessAdministratorFilterFactory.class),
+    @FullTextFilterDef(name = "status", impl = StatusFilterFactory.class),
+    @FullTextFilterDef(name = "deployment", impl = DeploymentFilterFactory.class)
+
+})
 public class AuditTaskImpl implements Serializable, AuditTask {
-    
-	private static final long serialVersionUID = 5388016330549830043L;
+
+    private static final long serialVersionUID = 5388016330549830043L;
 
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO, generator="auditIdSeq")
+    @GeneratedValue(strategy = GenerationType.AUTO, generator = "auditIdSeq")
     private Long id;
-    
+
     @Field(analyze = Analyze.NO, store = Store.YES)
     private Long taskId;
     @Field(analyze = Analyze.NO, store = Store.YES)
@@ -67,20 +86,18 @@ public class AuditTaskImpl implements Serializable, AuditTask {
     @Field(store = Store.YES)
     @Boost(0.8f)
     private String description = "";
-    
+
     @Field(store = Store.YES)
     @Boost(0.5f)
     private int priority;
-    
-    @Field( name = "createdBy", store =Store.YES)
-    private String createdBy ;
-    
 
-    @Field( name = "actualOwner", store = Store.YES)
+    @Field(name = "createdBy", store = Store.YES)
+    private String createdBy;
 
+    @Field(name = "actualOwner", store = Store.YES)
     private String actualOwner = "";
-    
-    @Field(store = org.hibernate.search.annotations.Store.YES)        
+
+    @Field(store = org.hibernate.search.annotations.Store.YES)
     @Temporal(javax.persistence.TemporalType.DATE)
     @DateBridge(resolution = org.hibernate.search.annotations.Resolution.SECOND)
     private Date createdOn;
@@ -88,43 +105,40 @@ public class AuditTaskImpl implements Serializable, AuditTask {
     @Temporal(javax.persistence.TemporalType.DATE)
 
     private Date dueDate;
-    
+
     @Field(analyze = Analyze.NO, store = Store.YES)
     private long processInstanceId;
-    
+
     @Field(analyze = Analyze.NO, name = "process", store = Store.YES)
     private String processId = "";
-    
-    
+
     private long processSessionId;
-    
+
     @Field(analyze = Analyze.NO, store = Store.YES)
     private long parentId;
-            
 
     @Field(analyze = Analyze.NO, name = "deployment", store = Store.YES)
     private String deploymentId = "";
-    
+
     @Field(analyze = Analyze.NO, store = Store.YES)
     private Long workItemId;
-    
+
     @Field(analyze = Analyze.NO)
     @ElementCollection
     @IndexedEmbedded()
     private Set<String> potentialOwners;
-    
+
     @Field(analyze = Analyze.NO)
     @ElementCollection
     @IndexedEmbedded()
     private Set<String> businessAdministrators;
 
-
     public AuditTaskImpl() {
     }
-    
-    public AuditTaskImpl(long taskId, String name, String status, Date activationTime, 
-            String actualOwner , String description, int priority, String createdBy, 
-            Date createdOn, Date dueDate, long processInstanceId, String processId, 
+
+    public AuditTaskImpl(long taskId, String name, String status, Date activationTime,
+            String actualOwner, String description, int priority, String createdBy,
+            Date createdOn, Date dueDate, long processInstanceId, String processId,
             long processSessionId, String deploymentId, long parentId, long workItemId, Set<String> potentialOwners, Set<String> businessAdministrators) {
         this.taskId = taskId;
         this.status = status;
@@ -153,8 +167,7 @@ public class AuditTaskImpl implements Serializable, AuditTask {
     public void setId(Long id) {
         this.id = id;
     }
-    
-    
+
     @Override
     public long getTaskId() {
         return taskId;
@@ -306,21 +319,18 @@ public class AuditTaskImpl implements Serializable, AuditTask {
     }
 
     @Override
-	public long getWorkItemId() {
-		return workItemId;
-	}
+    public long getWorkItemId() {
+        return workItemId;
+    }
 
     @Override
-	public void setWorkItemId(long workItemId) {
-		this.workItemId = workItemId;
-	}
-
-    
+    public void setWorkItemId(long workItemId) {
+        this.workItemId = workItemId;
+    }
 
     public void setTaskId(Long taskId) {
         this.taskId = taskId;
     }
-
 
     public void setWorkItemId(Long workItemId) {
         this.workItemId = workItemId;
@@ -342,6 +352,4 @@ public class AuditTaskImpl implements Serializable, AuditTask {
         this.businessAdministrators = businessAdministrators;
     }
 
-  
-        
 }
