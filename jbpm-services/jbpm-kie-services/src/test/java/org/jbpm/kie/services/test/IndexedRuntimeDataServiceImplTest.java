@@ -649,7 +649,6 @@ private static final Logger logger = LoggerFactory.getLogger(KModuleDeploymentSe
     }
     
     @Test
-    @Ignore
     public void testGetProcessInstanceHistory() {
     	
     	processInstanceId = processService.startProcess(deploymentUnit.getIdentifier(), "org.jbpm.writedocument");
@@ -710,7 +709,6 @@ private static final Logger logger = LoggerFactory.getLogger(KModuleDeploymentSe
     }
     
     @Test
-    @Ignore
     public void testGetVariableLogs() {
     	Map<String, Object> params = new HashMap<String, Object>();
     	params.put("approval_document", "initial content");
@@ -886,7 +884,6 @@ private static final Logger logger = LoggerFactory.getLogger(KModuleDeploymentSe
     }
     
     @Test
-    @Ignore
     public void testGetTasksAssignedAsPotentialOwnerByStatusPagingAndFiltering() {
     	List<Long> processInstanceIds = new ArrayList<Long>();
     	for (int i = 0; i < 10; i++) {

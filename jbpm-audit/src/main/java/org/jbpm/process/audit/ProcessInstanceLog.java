@@ -84,7 +84,7 @@ public class ProcessInstanceLog implements Serializable, AuditEvent, org.kie.api
     @Field(analyze = Analyze.NO, store = Store.YES)
     private String processVersion;
     
-    @Field(store = Store.YES)
+    @Field(analyze = Analyze.NO, store = Store.YES)
     private String processName;
    
     /**

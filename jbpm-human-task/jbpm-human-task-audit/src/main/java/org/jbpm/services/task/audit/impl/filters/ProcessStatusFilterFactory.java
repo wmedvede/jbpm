@@ -29,27 +29,27 @@ import org.hibernate.search.filter.StandardFilterKey;
 /**
  *
  * @author salaboy
+ * This is a Process Status 
  */
-public class DeploymentFilterFactory {
+public class ProcessStatusFilterFactory {
 
-    private String deploymentId = "";
+    private Integer status;
 
-    public void setDeploymentId(String deploymentId) {
-        this.deploymentId = deploymentId;
+    public void setStatus(Integer status) {
+        this.status = status;
     }
 
     @Key
     public FilterKey getKey() {
         StandardFilterKey key = new StandardFilterKey();
-        key.addParameter(deploymentId);
+        key.addParameter(status);
         return key;
     }
 
     @Factory
     public Filter getFilter() {
         //some additional steps to cache the filter results per IndexReader
-        Query query = new TermQuery(new Term("externalId", deploymentId));
+        Query query = new TermQuery(new Term("status", status.toString()));
         return new CachingWrapperFilter(new QueryWrapperFilter(query));
     }
-
 }

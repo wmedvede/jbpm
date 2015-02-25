@@ -126,8 +126,10 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
 
         @Override
         public void execute(FullTextQuery fullTextQuery) {
-            for (Integer i : states) {
-                fullTextQuery.enableFullTextFilter("status").setParameter("status", i.toString());
+            if(states != null && !states.isEmpty()){
+                for (Integer i : states) {
+                    fullTextQuery.enableFullTextFilter("status").setParameter("status", i);
+                }
             }
             super.execute(fullTextQuery);
 
@@ -145,7 +147,9 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
 
         @Override
         public void execute(FullTextQuery fullTextQuery) {
-            fullTextQuery.enableFullTextFilter("initiator").setParameter("initiator", initiator);
+            if(initiator != null && !initiator.isEmpty()){
+                fullTextQuery.enableFullTextFilter("initiator").setParameter("initiator", initiator);
+            }
             super.execute(fullTextQuery);
 
         }
@@ -163,6 +167,25 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
         @Override
         public void execute(FullTextQuery fullTextQuery) {
             fullTextQuery.enableFullTextFilter("processName").setParameter("processName", processName);
+            super.execute(fullTextQuery);
+
+        }
+    }
+    
+    private class GetProcessInstanceByProcessDefinitionIdAndStatus extends GetProcessInstanceByStatus {
+
+        private String processId;
+
+        public GetProcessInstanceByProcessDefinitionIdAndStatus(String processId, List<Integer> states) {
+            super(states);
+            this.processId = processId;
+        }
+
+        @Override
+        public void execute(FullTextQuery fullTextQuery) {
+            if(processId != null && !processId.isEmpty()){
+                fullTextQuery.enableFullTextFilter("processId").setParameter("processId", processId);
+            }
             super.execute(fullTextQuery);
 
         }
@@ -215,7 +238,9 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
 
         @Override
         public void execute(FullTextQuery fullTextQuery) {
-            fullTextQuery.enableFullTextFilter("processName").setParameter("processName", processName);
+            if(processName != null && !processName.isEmpty()){
+                fullTextQuery.enableFullTextFilter("processName").setParameter("processName", processName);
+            }
             super.execute(fullTextQuery);
 
         }
@@ -233,7 +258,29 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
 
         @Override
         public void execute(FullTextQuery fullTextQuery) {
-            fullTextQuery.enableFullTextFilter("processName").setParameter("processName", processName);
+            if(processName != null && !processName.isEmpty()){
+                fullTextQuery.enableFullTextFilter("processName").setParameter("processName", processName);
+            }
+            super.execute(fullTextQuery);
+
+        }
+
+    }
+    
+    private class GetProcessInstanceByProcessDefinitionId extends GetProcessInstanceIndexCommand {
+
+        private String processId;
+
+        public GetProcessInstanceByProcessDefinitionId(String processId) {
+            super();
+            this.processId = processId;
+        }
+
+        @Override
+        public void execute(FullTextQuery fullTextQuery) {
+            if(processId != null && !processId.isEmpty()){
+                fullTextQuery.enableFullTextFilter("processId").setParameter("processId", processId);
+            }
             super.execute(fullTextQuery);
 
         }
@@ -257,7 +304,9 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
                 query = qb.all().createQuery();
             }
             FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, entity);
-
+            
+            
+            
             cmd.execute(fullTextQuery);
             applyQueryContext(fullTextQuery, queryContext);
 
@@ -300,13 +349,13 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
     @Override
     public Collection<ProcessInstanceDesc> getProcessInstancesByProcessDefinition(String processDefId, QueryContext queryContext) {
         return executeQueryAgainstIndex(ProcessInstanceLog.class, queryContext, "", new String[]{},
-                new GetProcessInstanceByProcessName(processDefId));
+                new GetProcessInstanceByProcessDefinitionId(processDefId));
     }
 
     @Override
     public Collection<ProcessInstanceDesc> getProcessInstancesByProcessDefinition(String processDefId, List<Integer> states, QueryContext queryContext) {
         return executeQueryAgainstIndex(ProcessInstanceLog.class, queryContext, "", new String[]{},
-                new GetProcessInstanceByProcessNameAndStatus(processDefId, states));
+                new GetProcessInstanceByProcessDefinitionIdAndStatus(processDefId, states));
     }
 
     @Override
@@ -334,15 +383,15 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
             ProcessInstanceDesc processInstanceDesc = ProcessInstanceDescHelper.adapt(processInstanceLog);
 
             if (processInstanceLog != null) {
-                List<String> statuses = new ArrayList<String>();
-                statuses.add(Status.Ready.name());
-                statuses.add(Status.Reserved.name());
-                statuses.add(Status.InProgress.name());
+                List<String> states = new ArrayList<String>();
+                states.add(Status.Ready.name());
+                states.add(Status.Reserved.name());
+                states.add(Status.InProgress.name());
                 QueryBuilder qbTasks = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(AuditTaskImpl.class).get();
                 BooleanJunction<BooleanJunction> boolTasks = qbTasks.bool();
                 boolTasks.must(qb.keyword().onField("processInstanceId").matching(processInstanceDesc.getId()).createQuery());
-                for (String status : statuses) {
-                    boolTasks.should(qb.keyword().onField("status").matching(status).createQuery());
+                for (String state : states) {
+                    boolTasks.should(qb.keyword().onField("state").matching(state).createQuery());
                 }
                 Query queryTasks = boolTasks.createQuery();
                 FullTextQuery fullTextQueryTasks = fullTextEntityManager.createFullTextQuery(queryTasks, AuditTaskImpl.class);
@@ -693,14 +742,14 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
     }
 
     @Override
-    public List<TaskSummary> getTasksAssignedAsPotentialOwnerByStatus(String userId, List<Status> status, QueryFilter filter) {
+    public List<TaskSummary> getTasksAssignedAsPotentialOwnerByStatus(String userId, List<Status> states, QueryFilter filter) {
         FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
         try {
             QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(AuditTaskImpl.class).get();
 
             BooleanJunction<BooleanJunction> bool = qb.bool();
-            if (status != null && !status.isEmpty()) {
-                for (Status st : status) {
+            if (states != null && !states.isEmpty()) {
+                for (Status st : states) {
                     bool.should(qb.keyword().onField("status").matching(st.toString()).createQuery());
                 }
 

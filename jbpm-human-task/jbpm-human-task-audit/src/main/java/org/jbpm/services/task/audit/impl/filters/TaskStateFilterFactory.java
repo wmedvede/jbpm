@@ -29,26 +29,27 @@ import org.hibernate.search.filter.StandardFilterKey;
 /**
  *
  * @author salaboy
+ * This is a Task State filter
  */
-public class StatusFilterFactory {
+public class TaskStateFilterFactory {
 
-    private String status;
+    private String state;
 
-    public void setStatus(String status) {
-        this.status = status;
+    public void setState(String state) {
+        this.state = state;
     }
 
     @Key
     public FilterKey getKey() {
         StandardFilterKey key = new StandardFilterKey();
-        key.addParameter(status);
+        key.addParameter(state);
         return key;
     }
 
     @Factory
     public Filter getFilter() {
         //some additional steps to cache the filter results per IndexReader
-        Query query = new TermQuery(new Term("status", status));
+        Query query = new TermQuery(new Term("status", state));
         return new CachingWrapperFilter(new QueryWrapperFilter(query));
     }
 }

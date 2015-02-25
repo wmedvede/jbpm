@@ -34,7 +34,7 @@ import org.hibernate.search.filter.StandardFilterKey;
 public class ProcessDefinitionIdFilterFactory {
     private String processId = "";
 
-    public void setProcess(String processId) {
+    public void setProcessId(String processId) {
         this.processId = processId;
     }
 

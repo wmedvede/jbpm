@@ -42,7 +42,8 @@ import org.jbpm.services.task.audit.impl.filters.OwnerFilterFactory;
 import org.jbpm.services.task.audit.impl.filters.PotentialOwnerFilterFactory;
 import org.jbpm.services.task.audit.impl.filters.ProcessDefinitionNameFilterFactory;
 import org.jbpm.services.task.audit.impl.filters.ProcessInstanceInitiatorFilterFactory;
-import org.jbpm.services.task.audit.impl.filters.StatusFilterFactory;
+import org.jbpm.services.task.audit.impl.filters.TaskStateFilterFactory;
+import org.jbpm.services.task.audit.impl.filters.ProcessStatusFilterFactory;
 
 import org.kie.internal.task.api.AuditTask;
 
@@ -60,7 +61,8 @@ import org.kie.internal.task.api.AuditTask;
     @FullTextFilterDef(name = "owner", impl = OwnerFilterFactory.class),
     @FullTextFilterDef(name = "potentialOwner", impl = PotentialOwnerFilterFactory.class),
     @FullTextFilterDef(name = "businessAdministrator", impl = BusinessAdministratorFilterFactory.class),
-    @FullTextFilterDef(name = "status", impl = StatusFilterFactory.class),
+    @FullTextFilterDef(name = "states", impl = TaskStateFilterFactory.class),
+    @FullTextFilterDef(name = "status", impl = ProcessStatusFilterFactory.class),
     @FullTextFilterDef(name = "deployment", impl = DeploymentFilterFactory.class)
 
 })
