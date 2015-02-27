@@ -63,7 +63,7 @@ import org.slf4j.LoggerFactory;
 
 public class IndexedRuntimeDataServiceImplTest extends AbstractBaseTest {
 
-private static final Logger logger = LoggerFactory.getLogger(KModuleDeploymentServiceTest.class);   
+    private static final Logger logger = LoggerFactory.getLogger(KModuleDeploymentServiceTest.class);   
     
     private List<DeploymentUnit> units = new ArrayList<DeploymentUnit>();
     protected String correctUser = "testUser";

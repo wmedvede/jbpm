@@ -89,6 +89,60 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
 
     }
 
+    private class BaseTaskIndexedCommand implements IndexCommand {
+
+        @Override
+        public void execute(FullTextQuery fullTextQuery) {
+
+            fullTextQuery.setProjection("taskId", "name", "description", "status", "priority", "actualOwner", "createdBy",
+                    "createdOn", "activationTime", "dueDate", "processId", "processInstanceId", "parentId",
+                    "deploymentId");
+            fullTextQuery.setResultTransformer(new TaskSummaryResultTransformer());
+        }
+
+    }
+
+    private class GetTasksByStatusIndexCommand extends BaseTaskIndexedCommand {
+        private List<String> states;
+
+        public GetTasksByStatusIndexCommand(List<String> states) {
+            this.states = states;
+        }
+        
+        
+        @Override
+        public void execute(FullTextQuery fullTextQuery) {
+            if (states != null && !states.isEmpty()) {
+                for (String state : states) {
+                    fullTextQuery.enableFullTextFilter("states").setParameter("state", state);
+                }
+            }
+            super.execute(fullTextQuery);
+        }
+
+    }
+
+    private class GetTasksByProcessInstanceIdAndStatusIndexCommand extends GetTasksByStatusIndexCommand {
+
+        private Long processInstanceId;
+       
+        public GetTasksByProcessInstanceIdAndStatusIndexCommand(Long processInstanceId, List<String> states) {
+            super(states);
+            this.processInstanceId = processInstanceId;
+            
+        }
+        
+        
+        @Override
+        public void execute(FullTextQuery fullTextQuery) {
+            if (processInstanceId != null && processInstanceId > 0) {
+                fullTextQuery.enableFullTextFilter("processInstanceId").setParameter("processInstanceId", processInstanceId);
+            }
+            super.execute(fullTextQuery);
+        }
+
+    }
+
     private class BaseProcessInstanceIndexCommand implements IndexCommand {
 
         @Override
@@ -99,6 +153,27 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
             fullTextQuery.setResultTransformer(new ProcessInstanceDescResultTransformer());
         }
 
+    }
+
+    private class GetProcessInstanceByIdIndexCommand extends GetProcessInstanceIndexCommand {
+
+        Long processInstanceId;
+
+        public GetProcessInstanceByIdIndexCommand(Long processInstanceId) {
+            this.processInstanceId = processInstanceId;
+        }
+
+        public GetProcessInstanceByIdIndexCommand() {
+        }
+
+        @Override
+        public void execute(FullTextQuery fullTextQuery) {
+            if (processInstanceId != null && processInstanceId > 0) {
+                fullTextQuery.enableFullTextFilter("processInstanceId").setParameter("processInstanceId", processInstanceId);
+            }
+            super.execute(fullTextQuery);
+
+        }
     }
 
     private class GetProcessInstanceIndexCommand extends BaseProcessInstanceIndexCommand {
@@ -126,7 +201,7 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
 
         @Override
         public void execute(FullTextQuery fullTextQuery) {
-            if(states != null && !states.isEmpty()){
+            if (states != null && !states.isEmpty()) {
                 for (Integer i : states) {
                     fullTextQuery.enableFullTextFilter("status").setParameter("status", i);
                 }
@@ -147,7 +222,7 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
 
         @Override
         public void execute(FullTextQuery fullTextQuery) {
-            if(initiator != null && !initiator.isEmpty()){
+            if (initiator != null && !initiator.isEmpty()) {
                 fullTextQuery.enableFullTextFilter("initiator").setParameter("initiator", initiator);
             }
             super.execute(fullTextQuery);
@@ -171,7 +246,7 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
 
         }
     }
-    
+
     private class GetProcessInstanceByProcessDefinitionIdAndStatus extends GetProcessInstanceByStatus {
 
         private String processId;
@@ -183,7 +258,7 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
 
         @Override
         public void execute(FullTextQuery fullTextQuery) {
-            if(processId != null && !processId.isEmpty()){
+            if (processId != null && !processId.isEmpty()) {
                 fullTextQuery.enableFullTextFilter("processId").setParameter("processId", processId);
             }
             super.execute(fullTextQuery);
@@ -238,7 +313,7 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
 
         @Override
         public void execute(FullTextQuery fullTextQuery) {
-            if(processName != null && !processName.isEmpty()){
+            if (processName != null && !processName.isEmpty()) {
                 fullTextQuery.enableFullTextFilter("processName").setParameter("processName", processName);
             }
             super.execute(fullTextQuery);
@@ -258,7 +333,7 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
 
         @Override
         public void execute(FullTextQuery fullTextQuery) {
-            if(processName != null && !processName.isEmpty()){
+            if (processName != null && !processName.isEmpty()) {
                 fullTextQuery.enableFullTextFilter("processName").setParameter("processName", processName);
             }
             super.execute(fullTextQuery);
@@ -266,7 +341,7 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
         }
 
     }
-    
+
     private class GetProcessInstanceByProcessDefinitionId extends GetProcessInstanceIndexCommand {
 
         private String processId;
@@ -278,7 +353,7 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
 
         @Override
         public void execute(FullTextQuery fullTextQuery) {
-            if(processId != null && !processId.isEmpty()){
+            if (processId != null && !processId.isEmpty()) {
                 fullTextQuery.enableFullTextFilter("processId").setParameter("processId", processId);
             }
             super.execute(fullTextQuery);
@@ -288,6 +363,10 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
     }
 
     protected List executeQueryAgainstIndex(Class entity, QueryContext queryContext, String keyword, String[] fields, IndexCommand cmd) {
+        return (List) executeQueryAgainstIndex(entity, false, queryContext, keyword, fields, cmd);
+    }
+
+    protected Object executeQueryAgainstIndex(Class entity, boolean single, QueryContext queryContext, String keyword, String[] fields, IndexCommand cmd) {
         FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
         try {
             QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(entity).get();
@@ -304,13 +383,14 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
                 query = qb.all().createQuery();
             }
             FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, entity);
-            
-            
-            
+
             cmd.execute(fullTextQuery);
             applyQueryContext(fullTextQuery, queryContext);
-
-            return fullTextQuery.getResultList();
+            if(single){
+                return fullTextQuery.getSingleResult();
+            }else{
+                return fullTextQuery.getResultList();
+            }
         } finally {
             fullTextEntityManager.close();
         }
@@ -361,48 +441,21 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
     @Override
     // This one should be done with queries to the DB which should be more efficient than the index because it is a query by ID
     public ProcessInstanceDesc getProcessInstanceById(long processInstanceId) {
-        FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
-        try {
-            QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(ProcessInstanceLog.class).get();
 
-            // Apply query filters 
-            Query filters = applyDeploymentFilter(qb);
+        ProcessInstanceDesc pi = (ProcessInstanceDesc) executeQueryAgainstIndex(ProcessInstanceLog.class, true, null, "", new String[]{},
+                new GetProcessInstanceByIdIndexCommand(processInstanceId));
 
-            BooleanJunction<BooleanJunction> bool = qb.bool();
-
-            if (filters != null) {
-                bool.must(filters);
-            }
-            Query query = bool.must(qb.keyword().onField("processInstanceId").matching(processInstanceId).createQuery())
-                    .createQuery();
-
-            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, ProcessInstanceLog.class);
-
-            ProcessInstanceLog processInstanceLog = (ProcessInstanceLog) fullTextQuery.getSingleResult();
-            // Just because of the interface I need to translate ProcessInstanceLog to ProcessInstanceDesc
-            ProcessInstanceDesc processInstanceDesc = ProcessInstanceDescHelper.adapt(processInstanceLog);
-
-            if (processInstanceLog != null) {
-                List<String> states = new ArrayList<String>();
+        List<String> states = new ArrayList<String>();
                 states.add(Status.Ready.name());
                 states.add(Status.Reserved.name());
                 states.add(Status.InProgress.name());
-                QueryBuilder qbTasks = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(AuditTaskImpl.class).get();
-                BooleanJunction<BooleanJunction> boolTasks = qbTasks.bool();
-                boolTasks.must(qb.keyword().onField("processInstanceId").matching(processInstanceDesc.getId()).createQuery());
-                for (String state : states) {
-                    boolTasks.should(qb.keyword().onField("state").matching(state).createQuery());
-                }
-                Query queryTasks = boolTasks.createQuery();
-                FullTextQuery fullTextQueryTasks = fullTextEntityManager.createFullTextQuery(queryTasks, AuditTaskImpl.class);
-                List<AuditTaskImpl> auditTaskImpls = fullTextQueryTasks.getResultList();
-                ((org.jbpm.kie.services.impl.model.ProcessInstanceDesc) processInstanceDesc).setActiveTasks(UserTaskInstanceDescHelper.adaptCollection(auditTaskImpls));
-            }
+        List<UserTaskInstanceDesc> userTaskInstanceDescs = executeQueryAgainstIndex(AuditTaskImpl.class, null, "", new String[]{},
+                new GetTasksByProcessInstanceIdAndStatusIndexCommand(processInstanceId, states));
 
-            return processInstanceDesc;
-        } finally {
-            fullTextEntityManager.close();
-        }
+        ((org.jbpm.kie.services.impl.model.ProcessInstanceDesc) pi).setActiveTasks(userTaskInstanceDescs);
+
+        return pi;
+
     }
 
     @Override
@@ -795,7 +848,7 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
             potentialOwners.add(userId);
             potentialOwners.addAll(groupIds);
 
-            for(String potentialOwner : potentialOwners){
+            for (String potentialOwner : potentialOwners) {
                 fullTextQuery.enableFullTextFilter("potentialOwner").setParameter("potentialOwner", potentialOwner);
             }
 
@@ -852,7 +905,7 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
 
             FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, AuditTaskImpl.class);
             if (status != null && !status.isEmpty()) {
-                for(Status s : status){
+                for (Status s : status) {
                     fullTextQuery.enableFullTextFilter("status").setParameter("status", s.toString());
                 }
             }
@@ -998,7 +1051,7 @@ public class IndexedRuntimeDataServiceImpl implements RuntimeDataService, Deploy
     }
 
     protected void applyQueryContext(FullTextQuery fullTextQuery, QueryContext queryContext) {
-        if (fullTextQuery != null) {
+        if (fullTextQuery != null && queryContext != null) {
             fullTextQuery.setFirstResult(queryContext.getOffset());
             fullTextQuery.setMaxResults(queryContext.getCount());
 
