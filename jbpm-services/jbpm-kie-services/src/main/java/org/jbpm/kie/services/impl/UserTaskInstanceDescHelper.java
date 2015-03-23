@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.jbpm.services.api.model.UserTaskInstanceDesc;
 import org.jbpm.services.task.audit.impl.model.AuditTaskImpl;
+import org.jbpm.services.task.query.TaskSummaryImpl;
 
 /**
  *
@@ -36,6 +37,22 @@ public class UserTaskInstanceDescHelper {
         List<UserTaskInstanceDesc> utids = new ArrayList<UserTaskInstanceDesc>(ats.size());
         for(AuditTaskImpl at : ats){
             utids.add(adapt(at));
+        }
+        return utids;
+    }
+    
+    
+     public static UserTaskInstanceDesc adaptTs(TaskSummaryImpl at){
+        return new org.jbpm.kie.services.impl.model.UserTaskInstanceDesc(at.getId(), at.getStatusId(), 
+                at.getActivationTime(), at.getName(), at.getDescription(), at.getPriority(),
+                at.getActualOwner().getId(), at.getCreatedBy().getId(), at.getDeploymentId(), 
+                at.getProcessId(), at.getProcessInstanceId(), at.getCreatedOn(), at.getExpirationTime());
+    }
+    
+    public static List<UserTaskInstanceDesc> adaptCollectionTs(List<TaskSummaryImpl> ats){
+        List<UserTaskInstanceDesc> utids = new ArrayList<UserTaskInstanceDesc>(ats.size());
+        for(TaskSummaryImpl at : ats){
+            utids.add(adaptTs(at));
         }
         return utids;
     }

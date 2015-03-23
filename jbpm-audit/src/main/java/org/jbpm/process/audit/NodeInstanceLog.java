@@ -30,6 +30,7 @@ import javax.persistence.TemporalType;
 import org.hibernate.search.annotations.Analyze;
 import org.hibernate.search.annotations.Field;
 import org.hibernate.search.annotations.Indexed;
+import org.hibernate.search.annotations.Store;
 
 import org.jbpm.process.audit.event.AuditEvent;
 
@@ -45,31 +46,32 @@ public class NodeInstanceLog implements Serializable, AuditEvent, org.kie.api.ru
     @GeneratedValue(strategy = GenerationType.AUTO, generator="nodeInstanceLogIdSeq")
 	private long id;
     
-    @Field(analyze = Analyze.NO)
+    @Field(analyze = Analyze.NO, store = Store.YES)
     private long processInstanceId;
     
-    @Field(analyze = Analyze.NO)
+    @Field(analyze = Analyze.NO, store = Store.YES)
     private String processId;
     
     @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "log_date")
+    @Field( store = Store.YES)
     private Date date;
     
-    @Field(analyze = Analyze.NO)
+    @Field(analyze = Analyze.NO, store = Store.YES)
     private int type;
-    @Field(analyze = Analyze.NO)
+    @Field(analyze = Analyze.NO, store = Store.YES)
     private String nodeInstanceId;
-    @Field(analyze = Analyze.NO)
+    @Field(analyze = Analyze.NO, store = Store.YES)
     private String nodeId;
-    @Field()
+    @Field( store = Store.YES)
     private String nodeName;
-    @Field(analyze = Analyze.NO)
+    @Field(analyze = Analyze.NO, store = Store.YES)
     private String nodeType;
-    @Field(analyze = Analyze.NO)
+    @Field(analyze = Analyze.NO, store = Store.YES)
     private Long workItemId;
-    @Field(analyze = Analyze.NO)
+    @Field(analyze = Analyze.NO, store = Store.YES)
     private String connection;
-    @Field(analyze = Analyze.NO)
+    @Field(analyze = Analyze.NO, store = Store.YES)
     private String externalId;
     
     public NodeInstanceLog() {

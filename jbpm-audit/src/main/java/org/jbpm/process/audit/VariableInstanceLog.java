@@ -31,6 +31,7 @@ import javax.persistence.Transient;
 import org.hibernate.search.annotations.Analyze;
 import org.hibernate.search.annotations.Field;
 import org.hibernate.search.annotations.Indexed;
+import org.hibernate.search.annotations.Store;
 
 import org.jbpm.process.audit.event.AuditEvent;
 import org.slf4j.Logger;
@@ -53,26 +54,27 @@ public class VariableInstanceLog implements Serializable, AuditEvent, org.kie.ap
     @GeneratedValue(strategy = GenerationType.AUTO, generator="variableInstanceLogIdSeq")
 	private long id;
     
-    @Field(analyze = Analyze.NO)
+    @Field(name = "processInstanceId",  analyze = Analyze.NO, store = Store.YES)
     private long processInstanceId;
     
-    @Field(analyze = Analyze.NO)
+    @Field(analyze = Analyze.NO , store = Store.YES)
     private String processId;
     
     @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "log_date")
+    @Field(name = "date", store = Store.YES)
     private Date date;
     
-    @Field(analyze = Analyze.NO)
+    @Field(name = "variableInstanceId", analyze = Analyze.NO, store = Store.YES)
     private String variableInstanceId;
     
-    @Field(analyze = Analyze.NO)
+    @Field(name = "variableId", analyze = Analyze.NO, store = Store.YES)
     private String variableId;
-    @Field()
+    @Field(name = "newValue", store = Store.YES)
     private String value;
-    @Field()
+    @Field(name = "oldValue", store = Store.YES)
     private String oldValue;
-    @Field(analyze = Analyze.NO)
+    @Field(name = "externalId", analyze = Analyze.NO, store = Store.YES)
     private String externalId;
     
 	// constructors

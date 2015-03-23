@@ -39,6 +39,7 @@ import org.jbpm.services.api.model.UserTaskInstanceDesc;
 import org.jbpm.services.api.model.VariableDesc;
 import org.jbpm.services.task.audit.impl.model.AuditTaskImpl;
 import org.jbpm.services.task.audit.impl.model.TaskEventImpl;
+import org.jbpm.services.task.query.TaskSummaryImpl;
 import org.kie.api.task.model.Status;
 import org.kie.api.task.model.TaskSummary;
 import org.kie.internal.query.QueryContext;
@@ -52,15 +53,12 @@ import org.kie.internal.task.api.model.TaskEvent;
  */
 public class IndexedRuntimeDataServiceImpl extends AbstractRuntimeDataService {
 
-    
-
     protected EntityManagerFactory emf;
 
     public IndexedRuntimeDataServiceImpl(EntityManagerFactory emf) {
         this.emf = emf;
 
     }
-
 
     @Override
     public Collection<ProcessInstanceDesc> getProcessInstances(QueryContext queryContext) {
@@ -112,12 +110,12 @@ public class IndexedRuntimeDataServiceImpl extends AbstractRuntimeDataService {
                 new GetProcessInstanceByIdIndexCommand(processInstanceId));
 
         List<String> states = new ArrayList<String>();
-                states.add(Status.Ready.name());
-                states.add(Status.Reserved.name());
-                states.add(Status.InProgress.name());
-        List<AuditTaskImpl> auditTaskImpls = executeQueryAgainstIndex(AuditTaskImpl.class, null, "", new String[]{},
+        states.add(Status.Ready.toString());
+        states.add(Status.Reserved.toString());
+        states.add(Status.InProgress.toString());
+        List<TaskSummaryImpl> taskSummaryImpl = executeQueryAgainstIndex(AuditTaskImpl.class, null, "", new String[]{},
                 new GetTasksByProcessInstanceIdAndStatusIndexCommand(processInstanceId, states));
-        List<UserTaskInstanceDesc> userTaskInstanceDescs = UserTaskInstanceDescHelper.adaptCollection(auditTaskImpls);
+        List<UserTaskInstanceDesc> userTaskInstanceDescs = UserTaskInstanceDescHelper.adaptCollectionTs(taskSummaryImpl);
         ((org.jbpm.kie.services.impl.model.ProcessInstanceDesc) pi).setActiveTasks(userTaskInstanceDescs);
 
         return pi;
@@ -126,24 +124,9 @@ public class IndexedRuntimeDataServiceImpl extends AbstractRuntimeDataService {
 
     @Override
     public NodeInstanceDesc getNodeInstanceForWorkItem(Long workItemId) {
-        FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
-        try {
-            QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(NodeInstanceLog.class).get();
+        return (NodeInstanceDesc) executeQueryAgainstIndex(NodeInstanceLog.class, true, null, "", new String[]{},
+                new GetNodeInstanceByWorkItemIdIndexCommand(workItemId));
 
-            BooleanJunction<BooleanJunction> bool = qb.bool();
-
-            Query query = bool.must(qb.keyword().onField("workItemId").matching(workItemId).createQuery())
-                    .createQuery();
-
-            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, NodeInstanceLog.class);
-
-            NodeInstanceLog nodeInstanceLog = (NodeInstanceLog) fullTextQuery.getSingleResult();
-            // Just because of the interface I need to translate ProcessInstanceLog to ProcessInstanceDesc
-
-            return NodeInstanceDescHelper.adapt(nodeInstanceLog);
-        } finally {
-            fullTextEntityManager.close();
-        }
     }
 
     @Override
@@ -157,208 +140,62 @@ public class IndexedRuntimeDataServiceImpl extends AbstractRuntimeDataService {
     }
 
     protected Collection<NodeInstanceDesc> getProcessInstanceHistory(long processInstanceId, boolean completed, QueryContext queryContext) {
-        FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
-        try {
-            QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(NodeInstanceLog.class).get();
-
-            BooleanJunction<BooleanJunction> bool = qb.bool();
-
-            bool.must(qb.keyword().onField("processInstanceId").matching(processInstanceId).createQuery());
-            if (completed) {
-                bool.must(qb.keyword().onField("type").matching(1).createQuery());
-            } else {
-                bool.must(qb.keyword().onField("type").matching(0).createQuery());
-            }
-
-            Query query = bool.createQuery();
-
-            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, NodeInstanceLog.class);
-            //Apply Pagination & Sort Here
-            applyQueryContext(fullTextQuery, queryContext);
-
-            List<NodeInstanceLog> nodeInstanceLogs = fullTextQuery.getResultList();
-            // Just because of the interface I need to translate ProcessInstanceLog to ProcessInstanceDesc
-
-            return NodeInstanceDescHelper.adaptCollection(nodeInstanceLogs);
-        } finally {
-            fullTextEntityManager.close();
+        if (completed) {
+            return executeQueryAgainstIndex(NodeInstanceLog.class, queryContext, "", new String[]{},
+                    new GetNodeInstanceByProcessInstanceIdAndStateIndexCommand(processInstanceId, 1));
+        } else {
+            return executeQueryAgainstIndex(NodeInstanceLog.class, queryContext, "", new String[]{},
+                    new GetNodeInstanceByProcessInstanceIdAndStateIndexCommand(processInstanceId, 0));
         }
+
     }
 
     @Override
     public Collection<NodeInstanceDesc> getProcessInstanceFullHistory(long processInstanceId, QueryContext queryContext) {
-        FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
-        try {
-            QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(NodeInstanceLog.class).get();
+        return executeQueryAgainstIndex(NodeInstanceLog.class, queryContext, "", new String[]{},
+                new GetNodeInstanceByProcessInstanceIdIndexCommand(processInstanceId));
 
-            BooleanJunction<BooleanJunction> bool = qb.bool();
-
-            bool.must(qb.keyword().onField("processInstanceId").matching(processInstanceId).createQuery());
-
-            Query query = bool.createQuery();
-
-            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, NodeInstanceLog.class);
-            //Apply Pagination & Sort Here
-            applyQueryContext(fullTextQuery, queryContext);
-
-            List<NodeInstanceLog> nodeInstanceLogs = fullTextQuery.getResultList();
-            // Just because of the interface I need to translate ProcessInstanceLog to ProcessInstanceDesc
-
-            return NodeInstanceDescHelper.adaptCollection(nodeInstanceLogs);
-        } finally {
-            fullTextEntityManager.close();
-        }
     }
 
     @Override
     public Collection<NodeInstanceDesc> getProcessInstanceFullHistoryByType(long processInstanceId, EntryType type, QueryContext queryContext) {
-        FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
-        try {
-            QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(NodeInstanceLog.class).get();
+        return executeQueryAgainstIndex(NodeInstanceLog.class, queryContext, "", new String[]{},
+                new GetNodeInstanceByProcessInstanceIdAndTypeIndexCommand(processInstanceId, type));
 
-            BooleanJunction<BooleanJunction> bool = qb.bool();
-
-            bool.must(qb.keyword().onField("processInstanceId").matching(processInstanceId).createQuery());
-            bool.must(qb.keyword().onField("type").matching(type).createQuery());
-            Query query = bool.createQuery();
-
-            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, NodeInstanceLog.class);
-            //Apply Pagination & Sort Here
-            applyQueryContext(fullTextQuery, queryContext);
-
-            List<NodeInstanceLog> nodeInstanceLogs = fullTextQuery.getResultList();
-            // Just because of the interface I need to translate ProcessInstanceLog to ProcessInstanceDesc
-
-            return NodeInstanceDescHelper.adaptCollection(nodeInstanceLogs);
-        } finally {
-            fullTextEntityManager.close();
-        }
     }
 
     @Override
     public Collection<VariableDesc> getVariablesCurrentState(long processInstanceId) {
-        FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
-        try {
-            QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(VariableInstanceLog.class).get();
+        return executeQueryAgainstIndex(VariableInstanceLog.class, null, "", new String[]{},
+                new GetVariablesByProcessInstanceIdIndexCommand(processInstanceId));
 
-            BooleanJunction<BooleanJunction> bool = qb.bool();
-
-            bool.must(qb.keyword().onField("processInstanceId").matching(processInstanceId).createQuery());
-            Query query = bool.createQuery();
-
-            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, VariableInstanceLog.class);
-
-            List<VariableInstanceLog> variableLogs = fullTextQuery.getResultList();
-            // Just because of the interface I need to translate ProcessInstanceLog to ProcessInstanceDesc
-
-            return VariableDescHelper.adaptCollection(variableLogs);
-        } finally {
-            fullTextEntityManager.close();
-        }
     }
 
     @Override
     public Collection<VariableDesc> getVariableHistory(long processInstanceId, String variableId, QueryContext queryContext) {
-        FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
-        try {
-            QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(VariableInstanceLog.class).get();
+        return executeQueryAgainstIndex(VariableInstanceLog.class, queryContext, "", new String[]{},
+                new GetVariablesByIdAndProcessInstanceIdIndexCommand(variableId, processInstanceId));
 
-            BooleanJunction<BooleanJunction> bool = qb.bool();
-
-            bool.must(qb.keyword().onField("processInstanceId").matching(processInstanceId).createQuery());
-            bool.must(qb.keyword().onField("variableId").matching(variableId).createQuery());
-            Query query = bool.createQuery();
-
-            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, VariableInstanceLog.class);
-            //Apply Pagination & Sort Here
-            applyQueryContext(fullTextQuery, queryContext);
-
-            List<VariableInstanceLog> variableLogs = fullTextQuery.getResultList();
-            // Just because of the interface I need to translate ProcessInstanceLog to ProcessInstanceDesc
-
-            return VariableDescHelper.adaptCollection(variableLogs);
-        } finally {
-            fullTextEntityManager.close();
-        }
     }
-
-   
 
     @Override
     public UserTaskInstanceDesc getTaskByWorkItemId(Long workItemId) {
-        FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
-        try {
-            QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(AuditTaskImpl.class).get();
+        return (UserTaskInstanceDesc) UserTaskInstanceDescHelper.adaptTs((TaskSummaryImpl) executeQueryAgainstIndex(AuditTaskImpl.class, true, null, "", new String[]{},
+                new GetTasksByWorkItemIdIndexCommand(workItemId)));
 
-            BooleanJunction<BooleanJunction> bool = qb.bool();
-
-            bool.must(qb.keyword().onField("workItemId").matching(workItemId).createQuery());
-
-            Query query = bool.createQuery();
-
-            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, AuditTaskImpl.class);
-
-            AuditTaskImpl auditTaskLog = (AuditTaskImpl) fullTextQuery.getSingleResult();
-            // Just because of the interface I need to translate ProcessInstanceLog to ProcessInstanceDesc
-
-            return UserTaskInstanceDescHelper.adapt(auditTaskLog);
-        } finally {
-            fullTextEntityManager.close();
-        }
     }
 
     @Override
     public UserTaskInstanceDesc getTaskById(Long taskId) {
-        FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
-        try {
-            QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(AuditTaskImpl.class).get();
-
-            BooleanJunction<BooleanJunction> bool = qb.bool();
-
-            bool.must(qb.keyword().onField("taskId").matching(taskId).createQuery());
-
-            Query query = bool.createQuery();
-
-            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, AuditTaskImpl.class);
-
-            AuditTaskImpl auditTaskLog = (AuditTaskImpl) fullTextQuery.getSingleResult();
-            // Just because of the interface I need to translate ProcessInstanceLog to ProcessInstanceDesc
-
-            return UserTaskInstanceDescHelper.adapt(auditTaskLog);
-        } finally {
-            fullTextEntityManager.close();
-        }
+        return (UserTaskInstanceDesc) UserTaskInstanceDescHelper.adaptTs((TaskSummaryImpl) executeQueryAgainstIndex(AuditTaskImpl.class, true, null, "", new String[]{},
+                new GetTasksByTaskIdIndexCommand(taskId)));
     }
 
     @Override
-    public List<TaskSummary> getTasksAssignedAsBusinessAdministrator(String userId, QueryFilter filter) {
-        FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
-        try {
-            QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(AuditTaskImpl.class).get();
+    public List<TaskSummary> getTasksAssignedAsBusinessAdministrator(String adminId, QueryFilter filter) {
+        return executeQueryAgainstIndex(AuditTaskImpl.class, filter, "", new String[]{},
+                new GetTasksByBusinessAdministratorIndexCommand(adminId));
 
-            BooleanJunction<BooleanJunction> bool = qb.bool();
-            Map<String, Object> params = filter.getParams();
-            //Get the parameters from the query filter and create filter for()
-            for (String key : params.keySet()) {
-                bool.must(qb.keyword().onField(key).matching(params.get(key)).createQuery());
-            }
-
-            bool.must(qb.keyword().onField("businessAdministrators").matching(userId).createQuery());
-
-            Query query = bool.createQuery();
-
-            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, AuditTaskImpl.class);
-            applyQueryContext(fullTextQuery, filter);
-
-            fullTextQuery.setProjection("taskId", "name", "description", "status",
-                    "priority", "actualOwner", "createdBy", "createdOn", "activationTime",
-                    "dueDate", "process", "processInstanceId", "parentId", "deployent"); //, ProjectionConstants.EXPLANATION, ProjectionConstants.DOCUMENT);
-            fullTextQuery.setResultTransformer(new TaskSummaryResultTransformer());
-
-            return (List<TaskSummary>) fullTextQuery.getResultList();
-        } finally {
-            fullTextEntityManager.close();
-        }
     }
 
     @Override
@@ -368,27 +205,9 @@ public class IndexedRuntimeDataServiceImpl extends AbstractRuntimeDataService {
 
     @Override
     public List<TaskSummary> getTasksAssignedAsPotentialOwner(String userId, QueryFilter filter) {
-        FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
-        try {
-            QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(AuditTaskImpl.class).get();
+        return executeQueryAgainstIndex(AuditTaskImpl.class, filter, "", new String[]{},
+                new GetTasksByPotentialOwnerIndexCommand(userId));
 
-            BooleanJunction<BooleanJunction> bool = qb.bool();
-
-            bool.must(qb.keyword().wildcard().onField("potentialOwners").matching(userId + "*").createQuery());
-
-            Query query = bool.createQuery();
-
-            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, AuditTaskImpl.class);
-            applyQueryContext(fullTextQuery, filter);
-
-            fullTextQuery.setProjection("taskId", "name", "description", "status",
-                    "priority", "actualOwner", "createdBy", "createdOn", "activationTime",
-                    "dueDate", "process", "processInstanceId", "parentId", "deployent"); //, ProjectionConstants.EXPLANATION, ProjectionConstants.DOCUMENT);
-            fullTextQuery.setResultTransformer(new TaskSummaryResultTransformer());
-            return (List<TaskSummary>) fullTextQuery.getResultList();
-        } finally {
-            fullTextEntityManager.close();
-        }
     }
 
     @Override
@@ -399,78 +218,34 @@ public class IndexedRuntimeDataServiceImpl extends AbstractRuntimeDataService {
     @Override
     public List<TaskSummary> getTasksAssignedAsPotentialOwnerByStatus(String userId, List<Status> states, QueryFilter queryContext) {
         List<String> status = new ArrayList<String>(states.size());
-        for(Status s : states){
+        for (Status s : states) {
             status.add(s.toString());
         }
         return executeQueryAgainstIndex(AuditTaskImpl.class, queryContext, "", new String[]{},
-                new GetTasksByPotentialOwnerAndStatusIndexCommand(status, userId ));
-        
-        
-        
-//        FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
-//        try {
-//            QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(AuditTaskImpl.class).get();
-//
-//            BooleanJunction<BooleanJunction> bool = qb.bool();
-//            if (states != null && !states.isEmpty()) {
-//                for (Status st : states) {
-//                    bool.should(qb.keyword().onField("status").matching(st.toString()).createQuery());
-//                }
-//
-//            }
-//            bool.must(qb.keyword().wildcard().onField("potentialOwners").matching(userId + "*").createQuery());
-//
-//            Query query = bool.createQuery();
-//
-//            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, AuditTaskImpl.class);
-//            fullTextQuery.setProjection("taskId", "name", "description", "status",
-//                    "priority", "actualOwner", "createdBy", "createdOn", "activationTime",
-//                    "dueDate", "process", "processInstanceId", "parentId", "deployent"); //, ProjectionConstants.EXPLANATION, ProjectionConstants.DOCUMENT);
-//            fullTextQuery.setResultTransformer(new TaskSummaryResultTransformer());
-//            return (List<TaskSummary>) fullTextQuery.getResultList();
-//        } finally {
-//            fullTextEntityManager.close();
-//        }
+                new GetTasksByPotentialOwnerAndStatusIndexCommand(status, userId));
+
     }
 
-    protected String extractGroupIdsString(List<String> groupIds) {
-        StringBuilder sb = new StringBuilder();
-        for (String g : groupIds) {
-            sb.append(g).append(",");
-        }
-        return sb.toString();
-    }
+//    protected String extractGroupIdsString(List<String> groupIds) {
+//        StringBuilder sb = new StringBuilder();
+//        for (String g : groupIds) {
+//            sb.append(g).append(",");
+//        }
+//        return sb.toString();
+//    }
 
     @Override
     public List<TaskSummary> getTasksAssignedAsPotentialOwner(String userId, List<String> groupIds, List<Status> status, QueryFilter filter) {
-        FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
-        try {
-            QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(AuditTaskImpl.class).get();
-
-            Query query = qb.all().createQuery();
-
-            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, AuditTaskImpl.class);
-            if (status != null && !status.isEmpty()) {
-                for (Status s : status) {
-                    fullTextQuery.enableFullTextFilter("status").setParameter("status", s.toString());
-                }
-            }
-            List<String> potentialOwners = new ArrayList<String>();
-            potentialOwners.add(userId);
-            potentialOwners.addAll(groupIds);
-
-            for (String potentialOwner : potentialOwners) {
-                fullTextQuery.enableFullTextFilter("potentialOwner").setParameter("potentialOwner", potentialOwner);
-            }
-
-            fullTextQuery.setProjection("taskId", "name", "description", "status",
-                    "priority", "actualOwner", "createdBy", "createdOn", "activationTime",
-                    "dueDate", "process", "processInstanceId", "parentId", "deployent"); //, ProjectionConstants.EXPLANATION, ProjectionConstants.DOCUMENT);
-            fullTextQuery.setResultTransformer(new TaskSummaryResultTransformer());
-            return (List<TaskSummary>) fullTextQuery.getResultList();
-        } finally {
-            fullTextEntityManager.close();
+        List<String> potentialOwners = new ArrayList<String>();
+        potentialOwners.add(userId);
+        potentialOwners.addAll(groupIds);
+        List<String> statuses = new ArrayList<String>(status.size());
+        for (Status s : status) {
+            statuses.add(s.toString());
         }
+        return executeQueryAgainstIndex(AuditTaskImpl.class, filter, "", new String[]{},
+                new GetTasksByPotentialOwnersAndStatusIndexCommand(potentialOwners, statuses));
+
     }
 
     @Override
@@ -485,78 +260,29 @@ public class IndexedRuntimeDataServiceImpl extends AbstractRuntimeDataService {
 
     @Override
     public List<TaskSummary> getTasksOwned(String userId, QueryFilter filter) {
-        FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
-        try {
-            QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(AuditTaskImpl.class).get();
+        return executeQueryAgainstIndex(AuditTaskImpl.class, filter, "", new String[]{},
+                new GetTasksByOwnerIndexCommand(userId));
 
-            Query query = qb.all().createQuery();
-
-            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, AuditTaskImpl.class);
-
-            fullTextQuery.enableFullTextFilter("owner").setParameter("owner", userId);
-            applyQueryContext(fullTextQuery, filter);
-
-            fullTextQuery.setProjection("taskId", "name", "description", "status",
-                    "priority", "actualOwner", "createdBy", "createdOn", "activationTime",
-                    "dueDate", "process", "processInstanceId", "parentId", "deployent"); //, ProjectionConstants.EXPLANATION, ProjectionConstants.DOCUMENT);
-            fullTextQuery.setResultTransformer(new TaskSummaryResultTransformer());
-            return (List<TaskSummary>) fullTextQuery.getResultList();
-        } finally {
-            fullTextEntityManager.close();
-        }
     }
 
     @Override
     public List<TaskSummary> getTasksOwnedByStatus(String userId, List<Status> status, QueryFilter filter) {
-        FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
-        try {
-            QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(AuditTaskImpl.class).get();
-
-            Query query = qb.all().createQuery();
-
-            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, AuditTaskImpl.class);
-            if (status != null && !status.isEmpty()) {
-                for (Status s : status) {
-                    fullTextQuery.enableFullTextFilter("status").setParameter("status", s.toString());
-                }
-            }
-            fullTextQuery.enableFullTextFilter("owner").setParameter("owner", userId);
-            applyQueryContext(fullTextQuery, filter);
-
-            fullTextQuery.setProjection("taskId", "name", "description", "status",
-                    "priority", "actualOwner", "createdBy", "createdOn", "activationTime",
-                    "dueDate", "process", "processInstanceId", "parentId", "deployent"); //, ProjectionConstants.EXPLANATION, ProjectionConstants.DOCUMENT);
-            fullTextQuery.setResultTransformer(new TaskSummaryResultTransformer());
-            return (List<TaskSummary>) fullTextQuery.getResultList();
-        } finally {
-            fullTextEntityManager.close();
+        List<String> statuses = new ArrayList<String>(status.size());
+        for (Status s : status) {
+            statuses.add(s.toString());
         }
+        return executeQueryAgainstIndex(AuditTaskImpl.class, filter, "", new String[]{},
+                new GetTasksByOwnerAndStatusIndexCommand(userId, statuses));
+
     }
 
     @Override
+    // This should be getTaskIdsByProcessInstanceId
     public List<Long> getTasksByProcessInstanceId(Long processInstanceId) {
-        FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
-        try {
-            QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(AuditTaskImpl.class).get();
 
-            BooleanJunction<BooleanJunction> bool = qb.bool();
+        return executeQueryAgainstIndex(AuditTaskImpl.class, null, "", new String[]{},
+                new GetTasksIdByProcessInstanceIdIndexCommand(processInstanceId));
 
-            bool.must(qb.keyword().onField("processInstanceId").matching(processInstanceId).createQuery());
-
-            Query query = bool.createQuery();
-
-            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, AuditTaskImpl.class);
-
-            List<AuditTask> auditTaskLogs = fullTextQuery.getResultList();
-            // Just because of the interface I need to translate ProcessInstanceLog to ProcessInstanceDesc
-            List<Long> taskIds = new ArrayList<Long>();
-            for (AuditTask at : auditTaskLogs) {
-                taskIds.add(at.getTaskId());
-            }
-            return taskIds;
-        } finally {
-            fullTextEntityManager.close();
-        }
     }
 
     @Override
@@ -565,29 +291,32 @@ public class IndexedRuntimeDataServiceImpl extends AbstractRuntimeDataService {
     }
 
     @Override
+    // We need to standarize the model for these methods. 
     public List<AuditTask> getAllAuditTask(String userId, QueryFilter filter) {
-        FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
-        try {
-            QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(AuditTaskImpl.class).get();
-
-            BooleanJunction<BooleanJunction> bool = qb.bool();
-
-            bool.must(qb.keyword().onField("actualOwner").matching(userId).createQuery());
-
-            Query query = bool.createQuery();
-
-            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, AuditTaskImpl.class);
-
-            //Apply Pagination & Sort Here
-            applyQueryContext(fullTextQuery, filter);
-
-            List<AuditTask> auditTaskLog = fullTextQuery.getResultList();
-            // Just because of the interface I need to translate ProcessInstanceLog to ProcessInstanceDesc
-
-            return auditTaskLog;
-        } finally {
-            fullTextEntityManager.close();
-        }
+        return executeQueryAgainstIndex(AuditTaskImpl.class, filter, "", new String[]{},
+                new GetAuditTasksByOwnerIndexCommand(userId));
+//        FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
+//        try {
+//            QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(AuditTaskImpl.class).get();
+//
+//            BooleanJunction<BooleanJunction> bool = qb.bool();
+//
+//            bool.must(qb.keyword().onField("actualOwner").matching(userId).createQuery());
+//
+//            Query query = bool.createQuery();
+//
+//            FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, AuditTaskImpl.class);
+//
+//            //Apply Pagination & Sort Here
+//            applyQueryContext(fullTextQuery, filter);
+//
+//            List<AuditTask> auditTaskLog = fullTextQuery.getResultList();
+//            // Just because of the interface I need to translate ProcessInstanceLog to ProcessInstanceDesc
+//
+//            return auditTaskLog;
+//        } finally {
+//            fullTextEntityManager.close();
+//        }
     }
 
     @Override
@@ -616,18 +345,16 @@ public class IndexedRuntimeDataServiceImpl extends AbstractRuntimeDataService {
         }
     }
 
-    protected Query applyDeploymentFilter(QueryBuilder qb) {
-        List<String> deploymentIdForUser = getDeploymentsForUser();
-
-        if (deploymentIdForUser != null && !deploymentIdForUser.isEmpty()) {
-            return qb.keyword().onField("externalId").matching(deploymentIdForUser).createQuery();
-//    		params.put(FILTER, " log.externalId in (:deployments) ");
-//    		params.put("deployments", deploymentIdForUser);
-        }
-        return null;
-    }
-
-    
+//    protected Query applyDeploymentFilter(QueryBuilder qb) {
+//        List<String> deploymentIdForUser = getDeploymentsForUser();
+//
+//        if (deploymentIdForUser != null && !deploymentIdForUser.isEmpty()) {
+//            return qb.keyword().onField("externalId").matching(deploymentIdForUser).createQuery();
+////    		params.put(FILTER, " log.externalId in (:deployments) ");
+////    		params.put("deployments", deploymentIdForUser);
+//        }
+//        return null;
+//    }
 
     protected void applyQueryContext(FullTextQuery fullTextQuery, QueryContext queryContext) {
         if (fullTextQuery != null && queryContext != null) {
@@ -645,71 +372,287 @@ public class IndexedRuntimeDataServiceImpl extends AbstractRuntimeDataService {
         }
     }
 
+    private class BaseVariableIndexedCommand implements IndexCommand {
+
+        @Override
+        public void execute(FullTextQuery fullTextQuery) {
+            fullTextQuery.setProjection("variableId", "variableInstanceId", "oldValue", "newValue", "externalId", "processInstanceId", "date");
+            fullTextQuery.setResultTransformer(new VariableDescResultTransformer());
+        }
+
+    }
+
+    private class GetVariablesByProcessInstanceIdIndexCommand extends BaseVariableIndexedCommand {
+
+        private Long processInstanceId;
+
+        public GetVariablesByProcessInstanceIdIndexCommand(Long processInstanceId) {
+            this.processInstanceId = processInstanceId;
+        }
+
+        @Override
+        public void execute(FullTextQuery fullTextQuery) {
+            if (processInstanceId != null && processInstanceId != 0) {
+                fullTextQuery.enableFullTextFilter("processInstanceId").setParameter("processInstanceId", processInstanceId);
+            }
+            super.execute(fullTextQuery);
+        }
+
+    }
+
+    private class GetVariablesByIdAndProcessInstanceIdIndexCommand extends GetVariablesByProcessInstanceIdIndexCommand {
+
+        private String variableId;
+
+        public GetVariablesByIdAndProcessInstanceIdIndexCommand(String variableId, Long processInstanceId) {
+            super(processInstanceId);
+            this.variableId = variableId;
+        }
+
+        @Override
+        public void execute(FullTextQuery fullTextQuery) {
+            if (variableId != null && !variableId.isEmpty()) {
+                fullTextQuery.enableFullTextFilter("variableId").setParameter("variableId", variableId);
+            }
+            super.execute(fullTextQuery);
+        }
+
+    }
+
+    private class BaseAuditTaskIndexedCommand implements IndexCommand {
+
+        @Override
+        public void execute(FullTextQuery fullTextQuery) {
+
+            fullTextQuery.setProjection("taskId", "name", "status", "activationTime", "actualOwner", "description",
+                    "priority", "createdBy", "createdOn", "dueDate",
+                    "processInstanceId", "process", "processSessionId",
+                    "deployment", "parentId", "workItemId"
+//                    "potentialOwners", "businessAdministrators"
+            );
+            fullTextQuery.setResultTransformer(new AuditTaskResultTransformer());
+        }
+
+    }
+    
+
     private class BaseTaskIndexedCommand implements IndexCommand {
 
         @Override
         public void execute(FullTextQuery fullTextQuery) {
 
             fullTextQuery.setProjection("taskId", "name", "description", "status", "priority", "actualOwner", "createdBy",
-                    "createdOn", "activationTime", "dueDate", "processId", "processInstanceId", "parentId",
-                    "deploymentId");
+                    "createdOn", "activationTime", "dueDate", "process", "processInstanceId", "parentId",
+                    "deployment");
             fullTextQuery.setResultTransformer(new TaskSummaryResultTransformer());
         }
 
     }
 
+    private class BaseTaskIdIndexedCommand implements IndexCommand {
+
+        @Override
+        public void execute(FullTextQuery fullTextQuery) {
+
+            fullTextQuery.setProjection("taskId");
+            fullTextQuery.setResultTransformer(new TaskIdResultTransformer());
+        }
+
+    }
+
+    private class GetTasksByWorkItemIdIndexCommand extends BaseTaskIndexedCommand {
+
+        private Long workItemId;
+
+        public GetTasksByWorkItemIdIndexCommand(Long workItemId) {
+            this.workItemId = workItemId;
+        }
+
+        @Override
+        public void execute(FullTextQuery fullTextQuery) {
+            if (workItemId != null && workItemId > 0) {
+                fullTextQuery.enableFullTextFilter("workItemId").setParameter("workItemId", workItemId);
+            }
+            super.execute(fullTextQuery);
+        }
+
+    }
+
+    private class GetTasksByTaskIdIndexCommand extends BaseTaskIndexedCommand {
+
+        private Long taskId;
+
+        public GetTasksByTaskIdIndexCommand(Long taskId) {
+            this.taskId = taskId;
+        }
+
+        @Override
+        public void execute(FullTextQuery fullTextQuery) {
+            if (taskId != null && taskId > 0) {
+                fullTextQuery.enableFullTextFilter("taskId").setParameter("taskId", taskId);
+            }
+            super.execute(fullTextQuery);
+        }
+
+    }
+
     private class GetTasksByPotentialOwnerIndexCommand extends BaseTaskIndexedCommand {
+
         private String owner;
 
         public GetTasksByPotentialOwnerIndexCommand(String owner) {
             this.owner = owner;
         }
-        
-        
+
         @Override
         public void execute(FullTextQuery fullTextQuery) {
             if (owner != null && !owner.isEmpty()) {
-                    fullTextQuery.enableFullTextFilter("potentialOwner").setParameter("potentialOwner", owner);
+                fullTextQuery.enableFullTextFilter("potentialOwner").setParameter("potentialOwner", owner);
+            }
+            super.execute(fullTextQuery);
+        }
+
+    }
+
+    
+    private class GetAuditTasksByOwnerIndexCommand extends BaseAuditTaskIndexedCommand {
+
+        private String owner;
+
+        public GetAuditTasksByOwnerIndexCommand(String owner) {
+            this.owner = owner;
+        }
+
+        @Override
+        public void execute(FullTextQuery fullTextQuery) {
+            if (owner != null && !owner.isEmpty()) {
+                fullTextQuery.enableFullTextFilter("owner").setParameter("owner", owner);
             }
             super.execute(fullTextQuery);
         }
 
     }
     
+    private class GetTasksByBusinessAdministratorIndexCommand extends BaseTaskIndexedCommand {
+
+        private String admin;
+
+        public GetTasksByBusinessAdministratorIndexCommand(String admin) {
+            this.admin = admin;
+        }
+
+        @Override
+        public void execute(FullTextQuery fullTextQuery) {
+            if (admin != null && !admin.isEmpty()) {
+                fullTextQuery.enableFullTextFilter("businessAdministrator").setParameter("businessAdministrator", admin);
+            }
+            super.execute(fullTextQuery);
+        }
+
+    }
+
     private class GetTasksByPotentialOwnerAndStatusIndexCommand extends GetTasksByStatusIndexCommand {
+
         private String owner;
 
         public GetTasksByPotentialOwnerAndStatusIndexCommand(List<String> states, String owner) {
             super(states);
             this.owner = owner;
         }
-        
-        
+
         @Override
         public void execute(FullTextQuery fullTextQuery) {
             if (owner != null && !owner.isEmpty()) {
-                    fullTextQuery.enableFullTextFilter("potentialOwner").setParameter("potentialOwner", owner);
+                fullTextQuery.enableFullTextFilter("potentialOwner").setParameter("potentialOwner", owner);
             }
             super.execute(fullTextQuery);
         }
 
     }
-    
-    
+
+    private class GetTasksByPotentialOwnersAndStatusIndexCommand extends GetTasksByStatusIndexCommand {
+
+        private List<String> owners;
+
+        public GetTasksByPotentialOwnersAndStatusIndexCommand(List<String> owners, List<String> states) {
+            super(states);
+            this.owners = owners;
+        }
+
+        @Override
+        public void execute(FullTextQuery fullTextQuery) {
+            if (owners != null && !owners.isEmpty()) {
+                for (String owner : owners) {
+                    fullTextQuery.enableFullTextFilter("potentialOwner").setParameter("potentialOwner", owner);
+                }
+            }
+            super.execute(fullTextQuery);
+        }
+
+    }
+
     private class GetTasksByStatusIndexCommand extends BaseTaskIndexedCommand {
+
         private List<String> states;
 
         public GetTasksByStatusIndexCommand(List<String> states) {
             this.states = states;
         }
-        
-        
+
         @Override
         public void execute(FullTextQuery fullTextQuery) {
-            if (states != null && !states.isEmpty()) {
-                for (String state : states) {
-                    fullTextQuery.enableFullTextFilter("states").setParameter("state", state);
-                }
+            fullTextQuery.enableFullTextFilter("states").setParameter("states", states);
+            super.execute(fullTextQuery);
+        }
+
+    }
+
+    private class GetTasksByOwnerIndexCommand extends BaseTaskIndexedCommand {
+
+        private String owner;
+
+        public GetTasksByOwnerIndexCommand(String owner) {
+            this.owner = owner;
+        }
+
+        @Override
+        public void execute(FullTextQuery fullTextQuery) {
+            fullTextQuery.enableFullTextFilter("owner").setParameter("owner", owner);
+            super.execute(fullTextQuery);
+        }
+
+    }
+
+    private class GetTasksByOwnerAndStatusIndexCommand extends GetTasksByStatusIndexCommand {
+
+        private String owner;
+
+        public GetTasksByOwnerAndStatusIndexCommand(String owner, List<String> status) {
+            super(status);
+            this.owner = owner;
+        }
+
+        @Override
+        public void execute(FullTextQuery fullTextQuery) {
+            fullTextQuery.enableFullTextFilter("owner").setParameter("owner", owner);
+            super.execute(fullTextQuery);
+        }
+
+    }
+
+    private class GetTasksIdByProcessInstanceIdIndexCommand extends BaseTaskIdIndexedCommand {
+
+        private Long processInstanceId;
+
+        public GetTasksIdByProcessInstanceIdIndexCommand(Long processInstanceId) {
+            this.processInstanceId = processInstanceId;
+
+        }
+
+        @Override
+        public void execute(FullTextQuery fullTextQuery) {
+            if (processInstanceId != null && processInstanceId > 0) {
+                fullTextQuery.enableFullTextFilter("processInstanceId").setParameter("processInstanceId", processInstanceId);
             }
             super.execute(fullTextQuery);
         }
@@ -719,14 +662,13 @@ public class IndexedRuntimeDataServiceImpl extends AbstractRuntimeDataService {
     private class GetTasksByProcessInstanceIdAndStatusIndexCommand extends GetTasksByStatusIndexCommand {
 
         private Long processInstanceId;
-       
+
         public GetTasksByProcessInstanceIdAndStatusIndexCommand(Long processInstanceId, List<String> states) {
             super(states);
             this.processInstanceId = processInstanceId;
-            
+
         }
-        
-        
+
         @Override
         public void execute(FullTextQuery fullTextQuery) {
             if (processInstanceId != null && processInstanceId > 0) {
@@ -747,6 +689,90 @@ public class IndexedRuntimeDataServiceImpl extends AbstractRuntimeDataService {
             fullTextQuery.setResultTransformer(new ProcessInstanceDescResultTransformer());
         }
 
+    }
+
+    private class BaseNodeInstanceIndexCommand implements IndexCommand {
+
+        @Override
+        public void execute(FullTextQuery fullTextQuery) {
+            fullTextQuery.setProjection("id", "nodeId", "nodeName", "nodeType", "externalId", "processInstanceId", "date", "connection", "type", "workItemId"); //, ProjectionConstants.EXPLANATION, ProjectionConstants.DOCUMENT);
+            fullTextQuery.setResultTransformer(new NodeInstanceDescResultTransformer());
+        }
+
+    }
+
+    private class GetNodeInstanceByWorkItemIdIndexCommand extends BaseNodeInstanceIndexCommand {
+
+        Long workItemId;
+
+        public GetNodeInstanceByWorkItemIdIndexCommand(Long workItemId) {
+            this.workItemId = workItemId;
+        }
+
+        @Override
+        public void execute(FullTextQuery fullTextQuery) {
+            if (workItemId != null && workItemId > 0) {
+                fullTextQuery.enableFullTextFilter("workItemId").setParameter("workItemId", workItemId);
+            }
+            super.execute(fullTextQuery);
+
+        }
+    }
+
+    private class GetNodeInstanceByProcessInstanceIdIndexCommand extends BaseNodeInstanceIndexCommand {
+
+        Long processInstanceId;
+
+        public GetNodeInstanceByProcessInstanceIdIndexCommand(Long processInstanceId) {
+            this.processInstanceId = processInstanceId;
+        }
+
+        @Override
+        public void execute(FullTextQuery fullTextQuery) {
+            if (processInstanceId != null && processInstanceId > 0) {
+                fullTextQuery.enableFullTextFilter("processInstanceId").setParameter("processInstanceId", processInstanceId);
+            }
+            super.execute(fullTextQuery);
+
+        }
+    }
+
+    private class GetNodeInstanceByProcessInstanceIdAndStateIndexCommand extends GetNodeInstanceByProcessInstanceIdIndexCommand {
+
+        private Integer state;
+
+        public GetNodeInstanceByProcessInstanceIdAndStateIndexCommand(Long processInstanceId, Integer state) {
+            super(processInstanceId);
+            this.state = state;
+        }
+
+        @Override
+        public void execute(FullTextQuery fullTextQuery) {
+            if (state != null && state > 0) {
+                fullTextQuery.enableFullTextFilter("status").setParameter("status", state);
+            }
+            super.execute(fullTextQuery);
+
+        }
+    }
+
+    private class GetNodeInstanceByProcessInstanceIdAndTypeIndexCommand extends GetNodeInstanceByProcessInstanceIdIndexCommand {
+
+        private EntryType type;
+
+        public GetNodeInstanceByProcessInstanceIdAndTypeIndexCommand(Long processInstanceId, EntryType type) {
+            super(processInstanceId);
+            this.type = type;
+        }
+
+        @Override
+        public void execute(FullTextQuery fullTextQuery) {
+
+            fullTextQuery.enableFullTextFilter("nodeType").setParameter("type", String.valueOf(type.getValue()));
+
+            super.execute(fullTextQuery);
+
+        }
     }
 
     private class GetProcessInstanceByIdIndexCommand extends GetProcessInstanceIndexCommand {
@@ -964,7 +990,28 @@ public class IndexedRuntimeDataServiceImpl extends AbstractRuntimeDataService {
         FullTextEntityManager fullTextEntityManager = Search.getFullTextEntityManager(emf.createEntityManager());
         try {
             QueryBuilder qb = fullTextEntityManager.getSearchFactory().buildQueryBuilder().forEntity(entity).get();
-            Query query;
+            Query query = null;
+            BooleanJunction<BooleanJunction> paramsFragments = null;
+            if (queryContext instanceof QueryFilter) {
+
+                Map<String, Object> params = ((QueryFilter) queryContext).getParams();
+                if (!params.isEmpty()) {
+                    paramsFragments = qb.bool();
+                    //Get the parameters from the query filter and create filter for()
+                    for (String key : params.keySet()) {
+                        Object o = params.get(key);
+                        if (o instanceof Collection) {
+                            for (Object oc : ((Collection) o)) {
+                                paramsFragments.should(qb.keyword().onField(key).matching(oc).createQuery());
+                            }
+                        } else {
+                            paramsFragments.must(qb.keyword().onField(key).matching(o).createQuery());
+                        }
+                    }
+                }
+
+            }
+
             if (keyword != null && !keyword.isEmpty() && fields.length > 0) {
                 String matching;
                 if (keyword.contains("%")) {
@@ -972,17 +1019,26 @@ public class IndexedRuntimeDataServiceImpl extends AbstractRuntimeDataService {
                 } else {
                     matching = keyword;
                 }
-                query = qb.keyword().onFields(fields).matching(matching).createQuery();
-            } else {
-                query = qb.all().createQuery();
+                if (paramsFragments == null) {
+                    query = qb.keyword().onFields(fields).matching(matching).createQuery();
+                } else {
+                    paramsFragments.must(qb.keyword().onFields(fields).matching(matching).createQuery());
+                }
             }
+
+            if (query == null && paramsFragments == null) {
+                query = qb.all().createQuery();
+            } else if (paramsFragments != null) {
+                query = paramsFragments.createQuery();
+            }
+
             FullTextQuery fullTextQuery = fullTextEntityManager.createFullTextQuery(query, entity);
 
             cmd.execute(fullTextQuery);
             applyQueryContext(fullTextQuery, queryContext);
-            if(single){
+            if (single) {
                 return fullTextQuery.getSingleResult();
-            }else{
+            } else {
                 return fullTextQuery.getResultList();
             }
         } finally {

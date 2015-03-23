@@ -37,14 +37,18 @@ import org.hibernate.search.annotations.IndexedEmbedded;
 import org.hibernate.search.annotations.Store;
 import org.jbpm.services.task.audit.impl.filters.BusinessAdministratorFilterFactory;
 import org.jbpm.services.task.audit.impl.filters.DeploymentFilterFactory;
+import org.jbpm.services.task.audit.impl.filters.NodeTypeFilterFactory;
 import org.jbpm.services.task.audit.impl.filters.ProcessDefinitionIdFilterFactory;
 import org.jbpm.services.task.audit.impl.filters.OwnerFilterFactory;
 import org.jbpm.services.task.audit.impl.filters.PotentialOwnerFilterFactory;
 import org.jbpm.services.task.audit.impl.filters.ProcessDefinitionNameFilterFactory;
 import org.jbpm.services.task.audit.impl.filters.ProcessInstanceIdFilterFactory;
 import org.jbpm.services.task.audit.impl.filters.ProcessInstanceInitiatorFilterFactory;
-import org.jbpm.services.task.audit.impl.filters.TaskStateFilterFactory;
 import org.jbpm.services.task.audit.impl.filters.ProcessStatusFilterFactory;
+import org.jbpm.services.task.audit.impl.filters.TaskIdFilterFactory;
+import org.jbpm.services.task.audit.impl.filters.TaskStatesFilterFactory;
+import org.jbpm.services.task.audit.impl.filters.VariableIdFilterFactory;
+import org.jbpm.services.task.audit.impl.filters.WorkItemIdFilterFactory;
 
 import org.kie.internal.task.api.AuditTask;
 
@@ -57,15 +61,19 @@ import org.kie.internal.task.api.AuditTask;
 @SequenceGenerator(name = "auditIdSeq", sequenceName = "AUDIT_ID_SEQ", allocationSize = 1)
 @FullTextFilterDefs({
     @FullTextFilterDef(name = "processId", impl = ProcessDefinitionIdFilterFactory.class),
+    @FullTextFilterDef(name = "taskId", impl = TaskIdFilterFactory.class),
     @FullTextFilterDef(name = "processName", impl = ProcessDefinitionNameFilterFactory.class),
+    @FullTextFilterDef(name = "workItemId", impl = WorkItemIdFilterFactory.class),
     @FullTextFilterDef(name = "initiator", impl = ProcessInstanceInitiatorFilterFactory.class),
     @FullTextFilterDef(name = "processInstanceId", impl = ProcessInstanceIdFilterFactory.class),
     @FullTextFilterDef(name = "owner", impl = OwnerFilterFactory.class),
     @FullTextFilterDef(name = "potentialOwner", impl = PotentialOwnerFilterFactory.class),
     @FullTextFilterDef(name = "businessAdministrator", impl = BusinessAdministratorFilterFactory.class),
-    @FullTextFilterDef(name = "states", impl = TaskStateFilterFactory.class),
+    @FullTextFilterDef(name = "states", impl = TaskStatesFilterFactory.class),
     @FullTextFilterDef(name = "status", impl = ProcessStatusFilterFactory.class),
-    @FullTextFilterDef(name = "deployment", impl = DeploymentFilterFactory.class)
+    @FullTextFilterDef(name = "deployment", impl = DeploymentFilterFactory.class),
+    @FullTextFilterDef(name = "nodeType", impl = NodeTypeFilterFactory.class),
+    @FullTextFilterDef(name = "variableId", impl = VariableIdFilterFactory.class)
 
 })
 public class AuditTaskImpl implements Serializable, AuditTask {
@@ -127,12 +135,12 @@ public class AuditTaskImpl implements Serializable, AuditTask {
     @Field(analyze = Analyze.NO, store = Store.YES)
     private Long workItemId;
 
-    @Field(analyze = Analyze.NO)
+    @Field(analyze = Analyze.NO, store = Store.YES)
     @ElementCollection
     @IndexedEmbedded()
     private Set<String> potentialOwners;
 
-    @Field(analyze = Analyze.NO)
+    @Field(analyze = Analyze.NO, store = Store.YES)
     @ElementCollection
     @IndexedEmbedded()
     private Set<String> businessAdministrators;
